@@ -6,5 +6,6 @@ export { default as PreviewArea } from './preview-area';
 export { default as GalleryBackend } from './gallery-backend';
 export { default as AuthPage } from './auth-page';
 export { default as MyCreations } from './my-creations';
+export { ImageUploader, UploadButton } from './image-uploader';
 export * from './types';
 export { MaterialIcon, Icons } from './material-icon';

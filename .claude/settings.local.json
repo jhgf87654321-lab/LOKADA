@@ -12,7 +12,18 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git config:*)",
-      "Bash(git config user.name \"Your Name\")"
+      "Bash(git config user.name \"Your Name\")",
+      "Bash(git push:*)",
+      "Bash(gh repo create:*)",
+      "Bash(npm i:*)",
+      "Bash(vercel:*)",
+      "Bash(npm install)",
+      "Bash(VERCAL_SCOPE_ID=team_l1NUM6bfpfwMgW9DZEgLvrE vercel:*)",
+      "Bash(npm install:*)",
+      "Bash(/d/nextjs-better-auth-main/nextjs-better-auth-main/.vercel/project.json:*)",
+      "Bash(GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push:*)",
+      "Bash(gh auth login:*)",
+      "Bash(export:*)"
     ]
   }
 }

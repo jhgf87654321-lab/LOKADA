@@ -184,10 +184,24 @@ const App: React.FC = () => {
     }
   }, [uploadedImageUrl, pollTaskStatus]);
 
-  const handleFileUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const url = e.target?.result as string;
+  const handleFileUpload = async (file: File) => {
+    try {
+      // Upload to Vercel Blob
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '上传失败');
+      }
+
+      const url = data.url;
       const newImg: ImageAsset = {
         id: Date.now().toString(),
         url: url,
@@ -199,8 +213,13 @@ const App: React.FC = () => {
       setUploadedImageUrl(url);
       setMessages(prev => [...prev, { role: Role.USER, text: `已上传文件: ${file.name}` }]);
       setIsCurrentAdded(true);
-    };
-    reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      setMessages(prev => [...prev, {
+        role: Role.MODEL,
+        text: `上传失败：${error.message || '请稍后重试'}`
+      }]);
+    }
   };
 
   const handleAddToGallery = () => {

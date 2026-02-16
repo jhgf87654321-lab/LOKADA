@@ -4,12 +4,12 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "env": {
-    "BETTER_AUTH_SECRET": "@better-auth-secret",
-    "BETTER_AUTH_BASE_URL": "@better-auth-base-url",
+    "BETTER_AUTH_SECRET": "9BdulZ301lcLG9NqZe78XtQz7GLtFeDx",
+    "BETTER_AUTH_BASE_URL": "https://lokada.vercel.app",
     "DATABASE_URL": "@database-url",
     "DIRECT_URL": "@direct-url",
-    "NEXT_PUBLIC_BASE_URL": "@next-public-base-url",
-    "KIE_AI_API_KEY": "@kie-ai-api-key",
+    "NEXT_PUBLIC_BASE_URL": "https://lokada.vercel.app",
+    "KIE_AI_API_KEY": "5936831ca8119955328b3672d5eb85f8",
     "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token"
   }
 }

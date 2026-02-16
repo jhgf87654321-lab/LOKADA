@@ -5,6 +5,7 @@
   "framework": "nextjs",
   "env": {
     "BETTER_AUTH_SECRET": "@better-auth-secret",
+    "BETTER_AUTH_BASE_URL": "@better-auth-base-url",
     "DATABASE_URL": "@database-url",
     "DIRECT_URL": "@direct-url",
     "NEXT_PUBLIC_BASE_URL": "@next-public-base-url",

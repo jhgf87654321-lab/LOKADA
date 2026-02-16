@@ -44,11 +44,17 @@ export default function SignUpForm() {
         email: data.email,
         password: data.password,
         name: data.name,
+        username: data.username,
+        gender: data.gender,
       });
 
       if (response.error) {
-        console.log("SIGN_UP:", response.error.status);
-        toast.error(response.error.message);
+        const msg = response.error.message ?? "Registration failed.";
+        console.error("SIGN_UP error:", response.error.status, response);
+        toast.error(msg);
+        if (response.error.status === 500) {
+          toast.info("Open /api/debug/signup-dry-run in browser to see the exact DB error.", { duration: 8000 });
+        }
       } else {
         redirect("/");
       }

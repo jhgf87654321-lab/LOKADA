@@ -4,12 +4,12 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "env": {
-    "BETTER_AUTH_SECRET": "9BdulZ301lcLG9NqZe78XtQz7GLtFeDx",
+    "BETTER_AUTH_SECRET": "CaYKBEkHXr644oHKTKq7POcwnwOSftb2",
     "BETTER_AUTH_BASE_URL": "https://lokada.vercel.app",
-    "DATABASE_URL": "@database-url",
-    "DIRECT_URL": "@direct-url",
+    "DATABASE_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
+    "DIRECT_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
     "NEXT_PUBLIC_BASE_URL": "https://lokada.vercel.app",
     "KIE_AI_API_KEY": "5936831ca8119955328b3672d5eb85f8",
-    "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token"
+    "BLOB_READ_WRITE_TOKEN": "vercel_blob_rw_azUbBkYPoGPvfvFs_hqwYmUn1iylQkSafxIJP42qqKQtUTG"
   }
 }

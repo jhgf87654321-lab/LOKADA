@@ -20,17 +20,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack }) => {
     setError('');
 
     const formData = new FormData(e.currentTarget);
-    const username = formData.get('username') as string;
+    const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
     try {
-      const response = await signIn.username({
-        username,
+      const response = await signIn.email({
+        email,
         password,
-      } as any);
+      });
 
       if (response.error) {
-        setError(response.error.message || '用户名或密码错误');
+        setError(response.error.message || '邮箱或密码错误');
       } else {
         router.push('/');
         router.refresh();
@@ -78,14 +78,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack }) => {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700">
-                用户名
+                邮箱
               </label>
               <input
-                type="text"
-                name="username"
+                type="email"
+                name="email"
                 required
                 className="mt-1 block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-                placeholder="请输入用户名"
+                placeholder="请输入邮箱"
               />
             </div>
             <div>

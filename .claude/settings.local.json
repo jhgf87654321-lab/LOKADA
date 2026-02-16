@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill /PID 23560 /F)",
+      "Bash(npx drizzle-kit push)",
+      "Bash(ping:*)",
+      "Bash(npx drizzle-kit push:*)",
+      "Bash(netstat:*)",
+      "Bash(npx tsx:*)",
+      "Bash(nslookup:*)",
+      "Bash(git init)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git config user.name \"Your Name\")"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": {
+    "BETTER_AUTH_SECRET": "@better-auth-secret",
+    "DATABASE_URL": "@database-url",
+    "DIRECT_URL": "@direct-url",
+    "NEXT_PUBLIC_BASE_URL": "@next-public-base-url",
+    "KIE_AI_API_KEY": "@kie-ai-api-key"
+  }
+}

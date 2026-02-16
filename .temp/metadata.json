@@ -1,0 +1,8 @@
+{
+  "name": "LOKADA AI - Intelligent Product Development",
+  "description": "An AI-powered design platform for industrial workwear and professional apparel, featuring image generation and interactive design refinement.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

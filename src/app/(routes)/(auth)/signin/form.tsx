@@ -28,14 +28,14 @@ export default function SignInForm() {
   const form = useForm<SignInValues>({
     resolver: zodResolver(SignInSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
 
   function onSubmit(data: SignInValues) {
     startTransition(async () => {
-      const response = await signIn.username(data);
+      const response = await signIn.email(data);
 
       if (response.error) {
         console.log("SIGN_IN:", response.error.message);
@@ -60,14 +60,14 @@ export default function SignInForm() {
       >
         <FormField
           control={form.control}
-          name="username"
+          name="email"
           render={({ field }) => (
             <FormItem>
               <FormControl>
                 <InputStartIcon icon={AtSign}>
                   <Input
-                    placeholder="Username"
-                    className={cn("peer ps-9", getInputClassName("username"))}
+                    placeholder="Email"
+                    className={cn("peer ps-9", getInputClassName("email"))}
                     disabled={isPending}
                     {...field}
                   />

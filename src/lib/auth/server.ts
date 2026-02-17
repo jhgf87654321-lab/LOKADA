@@ -25,12 +25,17 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: (user) => {
+        before: async (user) => {
+          const u = user as Record<string, unknown>;
+          const username = typeof u.username === "string" ? u.username : undefined;
+          const displayUsername =
+            typeof u.display_username === "string" ? u.display_username : undefined;
+          const role = typeof u.role === "string" ? u.role : undefined;
+
           return {
             data: {
-              ...user,
-              display_username: (user as Record<string, unknown>).display_username ?? (user as Record<string, unknown>).username ?? "",
-              role: (user as Record<string, unknown>).role ?? "user",
+              display_username: displayUsername ?? username ?? "",
+              role: role ?? "user",
             },
           };
         },

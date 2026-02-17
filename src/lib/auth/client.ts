@@ -4,8 +4,12 @@ import { nextCookies } from "better-auth/next-js";
 
 export const { signIn, signUp, signOut, useSession, getSession } =
   createAuthClient({
-    // Use relative baseURL so preview/prod deployments always call same-origin `/api/auth/*`.
-    // This avoids CORS between Vercel preview domains and production domains.
+    // Always call same-origin in the browser (prevents Vercel preview -> prod CORS).
+    // Avoid relying on env-based base URL inference.
+    baseURL:
+      typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000",
     emailAndPassword: {
       enabled: true,
     },

@@ -7,6 +7,13 @@ const baseURL = process.env.BETTER_AUTH_BASE_URL || process.env.NEXT_PUBLIC_BASE
 
 export const auth = betterAuth({
   baseURL,
+  // Allow auth requests from Vercel preview + production domains (CSRF/origin-check).
+  // Without this, preview deployments calling `/api/auth/*` will be blocked with 403.
+  trustedOrigins: [
+    "http://localhost:3000",
+    "https://lokada-eight.vercel.app",
+    "https://*.vercel.app",
+  ],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

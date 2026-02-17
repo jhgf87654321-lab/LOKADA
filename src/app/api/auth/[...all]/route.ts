@@ -11,7 +11,7 @@ async function withErrorLog(
 ) {
   try {
     const res = await (method === "GET" ? handler.GET(req) : handler.POST(req));
-    if (res && res.status >= 500) {
+    if (res && (res.status >= 500 || res.status === 403)) {
       const clone = res.clone();
       let body: string | null = null;
       try {
@@ -23,8 +23,8 @@ async function withErrorLog(
       // Return JSON with message so client toast can show it
       try {
         const parsed = body ? JSON.parse(body) : {};
-        const msg = parsed.message ?? parsed.error ?? body ?? "Internal Server Error";
-        return NextResponse.json({ error: msg, message: msg }, { status: 500 });
+        const msg = parsed.message ?? parsed.error ?? body ?? (res.status === 403 ? "Forbidden" : "Internal Server Error");
+        return NextResponse.json({ error: msg, message: msg }, { status: res.status });
       } catch {
         return res;
       }

@@ -19,11 +19,11 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
   const [showPassword, setShowPassword] = useState(false);
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // Register form state
-  const [regEmail, setRegEmail] = useState('');
+  const [regPhone, setRegPhone] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
 
@@ -40,8 +40,8 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
     e.preventDefault();
     setError('');
 
-    if (!loginEmail.trim() || !loginPassword.trim()) {
-      setError('请填写邮箱和密码');
+    if (!loginPhone.trim() || !loginPassword.trim()) {
+      setError('请填写手机号和密码');
       return;
     }
 
@@ -53,7 +53,7 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
       }
 
       try {
-        await auth.signInWithEmailAndPassword(loginEmail.trim(), loginPassword.trim());
+        await auth.signInWithPhoneAndPassword(loginPhone.trim(), loginPassword.trim());
         startTransition(() => {
           router.push('/');
           router.refresh();
@@ -79,8 +79,8 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
     e.preventDefault();
     setError('');
 
-    if (!regEmail.trim() || !regPassword.trim()) {
-      setError('请填写邮箱和密码');
+    if (!regPhone.trim() || !regPassword.trim()) {
+      setError('请填写手机号和密码');
       return;
     }
 
@@ -102,10 +102,10 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
       }
 
       try {
-        // Create user with email and password
-        await auth.signUpWithEmailAndPassword(regEmail.trim(), regPassword.trim());
+        // Create user with phone and password
+        await auth.signUpWithPhoneAndPassword(regPhone.trim(), regPassword.trim());
         // Auto login after registration
-        await auth.signInWithEmailAndPassword(regEmail.trim(), regPassword.trim());
+        await auth.signInWithPhoneAndPassword(regPhone.trim(), regPassword.trim());
         startTransition(() => {
           router.push('/');
           router.refresh();
@@ -115,8 +115,8 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
           ? String((err as { message: string }).message)
           : '注册失败';
 
-        if (rawMsg.includes('email already exists') || rawMsg.includes('already')) {
-          setError('该邮箱已被注册');
+        if (rawMsg.includes('phone already exists') || rawMsg.includes('already')) {
+          setError('该手机号已被注册');
         } else if (rawMsg.includes('weak password') || rawMsg.includes('password')) {
           setError('密码强度不足，请使用更复杂的密码');
         } else {
@@ -158,28 +158,18 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
         )}
 
         <form className="mt-8 space-y-6" onSubmit={mode === 'login' ? handleLogin : handleRegister}>
-          {mode === 'register' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">昵称</label>
-              <input
-                type="text"
-                placeholder="请输入昵称"
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
-              />
-            </div>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              {mode === 'login' ? '邮箱' : '注册邮箱'}
+              {mode === 'login' ? '手机号' : '注册手机号'}
             </label>
             <input
-              type="email"
-              value={mode === 'login' ? loginEmail : regEmail}
-              onChange={(e) => mode === 'login' ? setLoginEmail(e.target.value) : setRegEmail(e.target.value)}
-              placeholder={mode === 'login' ? '请输入邮箱' : '将作为登录账号'}
+              type="tel"
+              value={mode === 'login' ? loginPhone : regPhone}
+              onChange={(e) => mode === 'login' ? setLoginPhone(e.target.value) : setRegPhone(e.target.value)}
+              placeholder={mode === 'login' ? '请输入手机号' : '将作为登录账号'}
               disabled={isPending}
               required
+              pattern="[0-9]{11}"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none"
             />
           </div>

@@ -7,7 +7,7 @@ import Sidebar from './sidebar';
 import ChatArea from './chat-area';
 import PreviewArea from './preview-area';
 import GalleryBackend from './gallery-backend';
-import AuthPage from './auth-page';
+import CloudbaseAuthPage from './cloudbase-auth-page';
 import MyCreations from './my-creations';
 
 const INITIAL_IMAGES: ImageAsset[] = [
@@ -240,7 +240,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background-light font-display">
-      <Header onStartTrial={() => setView('auth')} onOpenCreations={() => setView('creations')} />
+      <Header onOpenAuth={() => setView('cloudbase-auth')} onOpenCreations={() => setView('creations')} />
 
       <main className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -272,8 +272,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {view === 'auth' && (
-        <AuthPage
+      {view === 'cloudbase-auth' && (
+        <CloudbaseAuthPage
           onBack={() => setView('main')}
         />
       )}

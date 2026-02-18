@@ -9,6 +9,9 @@
     "DATABASE_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
     "DIRECT_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
     "NEXT_PUBLIC_BASE_URL": "https://lokada.vercel.app",
+    "NEXT_PUBLIC_CLOUDBASE_ENV": "@cloudbase-env",
+    "NEXT_PUBLIC_CLOUDBASE_CLIENT_ID": "@cloudbase-client-id",
+    "NEXT_PUBLIC_CLOUDBASE_REGION": "ap-shanghai",
     "KIE_AI_API_KEY": "5936831ca8119955328b3672d5eb85f8",
     "BLOB_READ_WRITE_TOKEN": "vercel_blob_rw_azUbBkYPoGPvfvFs_hqwYmUn1iylQkSafxIJP42qqKQtUTG"
   }

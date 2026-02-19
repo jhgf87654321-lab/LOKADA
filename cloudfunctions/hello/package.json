@@ -1,0 +1,6 @@
+{
+  "name": "hello",
+  "version": "1.0.0",
+  "description": "CloudBase 云函数示例",
+  "main": "index.js"
+}

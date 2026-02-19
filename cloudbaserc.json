@@ -1,0 +1,10 @@
+{
+  "version": "2.0",
+  "envId": "denglu-8gher1d52a21e6fe",
+  "region": "ap-shanghai",
+  "functionRoot": "./cloudfunctions",
+  "functions": [],
+  "cloudrun": {
+    "name": "denglu-8gher1d52a21e6fe"
+  }
+}

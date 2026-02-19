@@ -12,14 +12,100 @@ interface PreviewAreaProps {
 
 const PreviewArea: React.FC<PreviewAreaProps> = ({ designState, onAddToGallery, isAdded }) => {
   const [sliderValue, setSliderValue] = useState(50);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!designState.afterUrl) {
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      // 使用 Canvas API 处理跨域图片下载
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // 允许跨域
+      
+      img.onload = () => {
+        try {
+          // 创建 canvas 并绘制图片
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            throw new Error('无法创建 canvas 上下文');
+          }
+          
+          ctx.drawImage(img, 0, 0);
+          
+          // 将 canvas 转换为 blob
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              throw new Error('无法生成图片文件');
+            }
+            
+            // 创建临时下载链接
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // 生成文件名（使用时间戳）
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            link.download = `lokada-design-${timestamp}.png`;
+            
+            // 触发下载
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 清理临时 URL
+            window.URL.revokeObjectURL(url);
+            setIsDownloading(false);
+          }, 'image/png');
+        } catch (error) {
+          console.error('Canvas 处理失败:', error);
+          // 降级方案：直接打开图片链接，让用户右键保存
+          window.open(designState.afterUrl, '_blank');
+          setIsDownloading(false);
+        }
+      };
+      
+      img.onerror = () => {
+        console.error('图片加载失败，尝试直接下载');
+        // 降级方案：直接打开图片链接
+        const link = document.createElement('a');
+        link.href = designState.afterUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setIsDownloading(false);
+      };
+      
+      // 开始加载图片
+      img.src = designState.afterUrl;
+    } catch (error) {
+      console.error('下载失败:', error);
+      // 最后的降级方案：直接打开图片
+      window.open(designState.afterUrl, '_blank');
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <section className="w-[450px] border-l border-slate-200 bg-slate-50 flex flex-col">
       <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
         <h2 className="font-bold text-sm">主图展示区 (实时预览)</h2>
         <div className="flex gap-2">
-          <button className="size-8 rounded-lg bg-white flex items-center justify-center border border-slate-200 text-slate-500 hover:text-primary transition-colors" title="下载设计">
-            <Icons.Download className="text-sm" />
+          <button 
+            onClick={handleDownload}
+            disabled={isDownloading || !designState.afterUrl}
+            className="size-8 rounded-lg bg-white flex items-center justify-center border border-slate-200 text-slate-500 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+            title="下载设计"
+          >
+            <Icons.Download className={`text-sm ${isDownloading ? 'animate-pulse' : ''}`} />
           </button>
           <button className="size-8 rounded-lg bg-white flex items-center justify-center border border-slate-200 text-slate-500 hover:text-primary transition-colors" title="分享设计">
             <Icons.Share className="text-sm" />

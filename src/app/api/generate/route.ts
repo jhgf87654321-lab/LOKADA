@@ -1,36 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { generationTasks } from "@/db/schema/generation";
-import { eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth/server";
 import { headers } from "next/headers";
 
 const KIE_AI_API_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY!;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-// Points cost per generation
-const GENERATION_COST = 10;
-
-// Generate UUID without external library
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
 export async function POST(request: NextRequest) {
   try {
     const headersList = await headers();
-    console.log("API Headers:", headersList.get('cookie'));
-
-    const session = await auth.api.getSession({ headers: headersList });
-    console.log("Session:", session);
-
-    if (!session?.user) {
-      console.log("No session found, returning 401");
-      return NextResponse.json({ error: "Unauthorized - Please login first" }, { status: 401 });
-    }
-
-    const userId = session.user.id;
+    console.log("API Headers:", headersList.get("cookie"));
     const body = await request.json();
 
     const {
@@ -47,9 +25,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    // Create task in database
-    const taskId = generateId();
 
     // Prepare image_input if original image is provided
     const imageInput = originalImageUrl ? [originalImageUrl] : [];
@@ -84,41 +59,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const kieTaskId = kieData.data?.taskId;
+    const taskId = kieData.data?.taskId as string | undefined;
 
-    if (!kieTaskId) {
+    if (!taskId) {
       return NextResponse.json(
         { error: "Invalid response from Kie.ai API" },
         { status: 500 }
       );
     }
 
-    // Save task to database
-    await db.insert(generationTasks).values({
-      id: taskId,
-      userId,
-      taskId: kieTaskId,
-      status: "processing",
-      prompt,
-      aspectRatio,
-      resolution,
-      outputFormat,
-      originalImageUrl: originalImageUrl || null,
-      pointsDeducted: GENERATION_COST,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
     return NextResponse.json({
       success: true,
       taskId,
-      kieTaskId,
       message: "Generation task created successfully",
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Generate API error:", error);
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message: string }).message)
+        : "Internal server error";
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string | number }).code)
+        : undefined;
+    const cause =
+      error && typeof error === "object" && "cause" in error
+        ? String((error as { cause?: unknown }).cause)
+        : undefined;
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: message,
+        code,
+        cause,
+      },
       { status: 500 }
     );
   }
@@ -126,40 +101,28 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const headersList = await headers();
-    const session = await auth.api.getSession({ headers: headersList });
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized - Please login first" }, { status: 401 });
-    }
-
-    const userId = session.user.id;
-    const searchParams = request.nextUrl.searchParams;
-    const taskId = searchParams.get("taskId");
-
-    if (taskId) {
-      // Get specific task
-      const task = await db.query.generationTasks.findFirst({
-        where: eq(generationTasks.id, taskId),
-      });
-
-      if (!task || task.userId !== userId) {
-        return NextResponse.json({ error: "Task not found" }, { status: 404 });
-      }
-
-      return NextResponse.json({ task });
-    }
-
-    // Get all tasks for user
-    const tasks = await db.query.generationTasks.findMany({
-      where: eq(generationTasks.userId, userId),
-      orderBy: [desc(generationTasks.createdAt)],
-    });
-
-    return NextResponse.json({ tasks });
-  } catch (error) {
+    // 历史任务列表暂未迁移到 CloudBase，这里先返回空列表占位
+    return NextResponse.json({ tasks: [] });
+  } catch (error: unknown) {
     console.error("Get tasks API error:", error);
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message: string }).message)
+        : "Internal server error";
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string | number }).code)
+        : undefined;
+    const cause =
+      error && typeof error === "object" && "cause" in error
+        ? String((error as { cause?: unknown }).cause)
+        : undefined;
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: message,
+        code,
+        cause,
+      },
       { status: 500 }
     );
   }

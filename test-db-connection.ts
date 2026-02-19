@@ -1,7 +1,13 @@
 import postgres from "postgres";
 
 async function testConnection() {
-  const DATABASE_URL = "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres";
+  const DATABASE_URL = process.env.DATABASE_URL;
+
+  if (!DATABASE_URL) {
+    console.error("DATABASE_URL is not set. Please configure your CloudBase 数据库连接字符串。");
+    process.exit(1);
+  }
+
   console.log("Testing connection to:", DATABASE_URL.replace(/:[^:@]+@/, ":****@"));
 
   try {

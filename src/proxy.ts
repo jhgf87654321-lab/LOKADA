@@ -5,26 +5,26 @@ import {
   apiAuthPrefix,
   authRoutes,
   DEFAULT_LOGIN_REDIRECT,
-  publicRoutes,
 } from "./routes";
 
 export async function proxy(request: NextRequest) {
   const session = getSessionCookie(request);
+  const pathname = request.nextUrl.pathname;
+  const isApiAuth = pathname.startsWith(apiAuthPrefix);
+  const isApiDebug = pathname.startsWith("/api/debug");
+  const isApiRoute = pathname.startsWith("/api/");
 
-  const isApiAuth = request.nextUrl.pathname.startsWith(apiAuthPrefix);
-  const isApiDebug = request.nextUrl.pathname.startsWith("/api/debug");
-
-  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname) || isApiDebug;
-
-  const isAuthRoute = () => {
-    return authRoutes.some((path) => request.nextUrl.pathname.startsWith(path));
-  };
+  // Never redirect API routes; let route handlers return JSON.
+  if (isApiRoute) {
+    return NextResponse.next();
+  }
 
   if (isApiAuth || isApiDebug) {
     return NextResponse.next();
   }
 
-  if (isAuthRoute()) {
+  const isAuthRoute = authRoutes.some((path) => pathname.startsWith(path));
+  if (isAuthRoute) {
     if (session) {
       return NextResponse.redirect(
         new URL(DEFAULT_LOGIN_REDIRECT, request.url),
@@ -33,10 +33,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!session && !isPublicRoute) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
+  // 不再将未登录用户重定向到 /cloudbase/login，以避免重定向死循环。
+  // 各页面自行处理鉴权（如 dashboard 展示「去登录」链接）。
   return NextResponse.next();
 }
 

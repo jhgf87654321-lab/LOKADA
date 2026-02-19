@@ -19,7 +19,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
   const [interimTranscript, setInterimTranscript] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -27,81 +28,67 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
     }
   }, [messages, isGenerating]);
 
-  // Initialize speech recognition
-  useEffect(() => {
-    const SpeechRecognition = (typeof window !== 'undefined' && (
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition
-    ));
-
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'zh-CN';
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        setVoiceStatus('listening');
-      };
-
-      recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            final += result[0].transcript;
-          } else {
-            interim += result[0].transcript;
-          }
-        }
-
-        if (final) {
-          setInput(prev => prev + final);
-        }
-        setInterimTranscript(interim);
-      };
-
-      recognition.onerror = (event: any) => {
-        if (event.error === 'not-allowed') {
-          setVoiceStatus('error');
-        } else if (event.error === 'no-speech') {
-          setVoiceStatus('idle');
-        } else {
-          setVoiceStatus('idle');
-        }
-      };
-
-      recognition.onend = () => {
-        if (voiceStatus === 'listening') {
-          setVoiceStatus('stopped');
-        }
-      };
-
-      recognitionRef.current = recognition;
-    }
-  }, [voiceStatus]);
-
-  const toggleVoiceInput = () => {
-    if (!recognitionRef.current) {
-      alert('您的浏览器不支持语音识别功能，请使用 Chrome 或 Edge 浏览器。');
+  const toggleVoiceInput = async () => {
+    // 正在录音 -> 停止
+    if (voiceStatus === 'listening') {
+      mediaRecorderRef.current?.stop();
+      setVoiceStatus('stopped');
       return;
     }
 
-    if (voiceStatus === 'listening') {
-      recognitionRef.current.stop();
-      setVoiceStatus('stopped');
+    // 开始录音
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('当前浏览器不支持录音，请使用最新版 Chrome 或 Edge。');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        audioChunksRef.current = [];
+
+        if (!blob.size) return;
+
+        try {
+          // 上传到后端 /api/asr
+          const res = await fetch('/api/asr', {
+            method: 'POST',
+            body: blob,
+          });
+          const data = await res.json();
+
+          if (data?.text) {
+            setInput((prev) => prev + data.text);
+          } else if (data?.error) {
+            console.error('ASR error:', data.error, data?.details);
+            // 可选：在 UI 上显示错误提示
+            setInterimTranscript(`识别失败: ${data.error}`);
+          }
+        } catch (e) {
+          console.error('上传音频或识别失败:', e);
+        } finally {
+          // 停掉麦克风
+          stream.getTracks().forEach((t) => t.stop());
+        }
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setVoiceStatus('listening');
       setInterimTranscript('');
-    } else {
-      setInput(prev => prev);
-      setInterimTranscript('');
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error('Failed to start recognition:', e);
-      }
+    } catch (err) {
+      console.error('获取麦克风失败:', err);
+      setVoiceStatus('error');
     }
   };
 

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+
+# Build outputs
+.next
+out
+build
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env (inject at deploy, do not bake in image)
+.env*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Misc
+.DS_Store
+*.pem
+README.md
+DEPLOY.md
+
+# Cloud functions (not part of main app)
+cloudfunctions
+
+# Optional
+coverage
+.vercel

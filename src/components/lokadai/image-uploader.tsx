@@ -50,14 +50,15 @@ export function ImageUploader({
     setUploadProgress(10);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
       setUploadProgress(30);
 
       const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-file-name': encodeURIComponent(file.name || 'upload'),
+        },
+        body: file,
       });
 
       setUploadProgress(70);
@@ -203,12 +204,13 @@ export function UploadButton({ onUploadComplete }: { onUploadComplete: (url: str
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
       const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-file-name': encodeURIComponent(file.name || 'upload'),
+        },
+        body: file,
       });
 
       const data = await response.json();

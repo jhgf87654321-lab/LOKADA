@@ -1,17 +1,4 @@
-import * as schema from "./schema";
-import postgres from "postgres";
-import { drizzle } from "drizzle-orm/postgres-js";
-
-// Supabase connection pooler URL
-const DB_URL = process.env.DATABASE_URL!;
-
-console.log("[DB] Connecting to:", DB_URL.replace(/:[^:@]+@/, ":****@"));
-
-const client = postgres(DB_URL, {
-  ssl: { rejectUnauthorized: false },
-  max: 10,
-  idle_timeout: 20,
-  connect_timeout: 30,
-  no_prepare: true,
-});
-export const db = drizzle(client, { schema });
+// Supabase/Postgres 连接已移除，后续数据读写请迁移到 CloudBase。
+// 该导出仅作为占位，防止遗留导入报错；请不要在新代码中继续使用 `db`。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const db: any = null;

@@ -7,8 +7,8 @@ import Sidebar from './sidebar';
 import ChatArea from './chat-area';
 import PreviewArea from './preview-area';
 import GalleryBackend from './gallery-backend';
-import CloudbaseAuthPage from './cloudbase-auth-page';
 import MyCreations from './my-creations';
+import { getCloudbaseAuth } from '@/lib/cloudbase';
 
 const INITIAL_IMAGES: ImageAsset[] = [
   { id: '1', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBdgJBcXeB3Zkito5LZSDl04gElAhWN-7GSdGwZryHkxZogwHjEC45zD3LqOpf61h9krLI_T2s4HlewL1feGuzvUMDXXD7lsr64bcOoLEGdnC_Dh9olqFbcaRnNq-bDxEoTURXypS_AtueJzibCBJ-ZImYDS8aGG5nBQ8uyxb3LZo99rmU0RKPa7PrpLRWlvspNAXW4vzN_-6fFRfxfkZUuKig4yKL-oN37fIHH3zRp-OvGYfS59Fayi_DAL2af41tNFdvrr6ZBUPNL', alt: '深蓝色夹克设计稿', timestamp: Date.now() - 1000000 },
@@ -28,6 +28,43 @@ const MODELS: ModelOption[] = [
   { id: 'banana', name: 'Nano Banana', description: '创意视觉增强', avatar: 'https://picsum.photos/id/65/100/100' },
   { id: 'qwen', name: 'Qwen-VL', description: '多模态语义理解', avatar: 'https://picsum.photos/id/66/100/100' },
 ];
+
+// 检查 CloudBase 登录状态
+function isCloudbaseLoggedIn(auth: unknown) {
+  const a = auth as any;
+  if (!a) return false;
+  try {
+    const state = a.getLoginState?.();
+    if (!state) return false;
+    const provider = state.credential?.provider;
+    if (provider && String(provider).toLowerCase() === "anonymous") {
+      return false;
+    }
+    const user = state.user || a.currentUser;
+    const hasIdentity = Boolean(user && (user.phoneNumber || user.email || user.username));
+    return hasIdentity;
+  } catch {
+    return Boolean(a?.hasLoginState?.() ?? a?.isLoginState?.());
+  }
+}
+
+async function ensureCloudbaseLoggedIn(): Promise<boolean> {
+  const auth = getCloudbaseAuth();
+  if (!auth) return false;
+  if (isCloudbaseLoggedIn(auth)) return true;
+
+  // getLoginState/currentUser 可能还没就绪，这里用 getCurrentUser 兜底一次（带软超时）
+  try {
+    const current = await Promise.race([
+      auth.getCurrentUser(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+    ]);
+    const u = current as any;
+    return Boolean(u && (u.phoneNumber || u.email || u.username));
+  } catch {
+    return false;
+  }
+}
 
 // Generation task type
 interface GenerationTask {
@@ -123,6 +160,16 @@ const App: React.FC = () => {
   }, []);
 
   const handleSendMessage = useCallback(async (text: string) => {
+    // 检查登录状态
+    const ok = await ensureCloudbaseLoggedIn();
+    if (!ok) {
+      setMessages(prev => [...prev, {
+        role: Role.MODEL,
+        text: "请登录以后再进行操作"
+      }]);
+      return;
+    }
+
     const userMsg: Message = { role: Role.USER, text };
     setMessages(prev => [...prev, userMsg]);
     setIsGenerating(true);
@@ -145,16 +192,26 @@ const App: React.FC = () => {
         })
       });
 
-      const data = await response.json();
+      const raw = await response.text();
+      let data: any = undefined;
+      try {
+        data = raw ? JSON.parse(raw) : undefined;
+      } catch {
+        data = undefined;
+      }
 
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('请先登录后再使用生成功能');
         }
-        throw new Error(data.error || `请求失败 (${response.status})`);
+        const errMsg =
+          (data && typeof data === 'object' ? (data.error ?? data.message) : undefined) ??
+          (raw || undefined) ??
+          `请求失败 (${response.status})`;
+        throw new Error(`[${response.status}] ${String(errMsg)}`);
       }
 
-      if (data.success && data.taskId) {
+      if (data && data.success && data.taskId) {
         setCurrentTaskId(data.taskId);
 
         setMessages(prev => [...prev, {
@@ -172,7 +229,11 @@ const App: React.FC = () => {
           pollTaskStatus(data.taskId);
         }, 3000);
       } else {
-        throw new Error(data.error || 'Failed to create generation task');
+        const errMsg =
+          (data && typeof data === 'object' ? (data.error ?? data.message) : undefined) ??
+          (raw || undefined) ??
+          'Failed to create generation task';
+        throw new Error(String(errMsg));
       }
     } catch (error: any) {
       console.error('Generation error:', error);
@@ -185,23 +246,46 @@ const App: React.FC = () => {
   }, [uploadedImageUrl, pollTaskStatus]);
 
   const handleFileUpload = async (file: File) => {
-    try {
-      // Upload to Vercel Blob
-      const formData = new FormData();
-      formData.append('file', file);
+    // 检查登录状态
+    const ok = await ensureCloudbaseLoggedIn();
+    if (!ok) {
+      setMessages(prev => [...prev, {
+        role: Role.MODEL,
+        text: "请登录以后再进行操作"
+      }]);
+      return;
+    }
 
+    try {
       const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-file-name': encodeURIComponent(file.name || 'upload'),
+        },
+        body: file,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || '上传失败');
+      const raw = await response.text();
+      let data: any = undefined;
+      try {
+        data = raw ? JSON.parse(raw) : undefined;
+      } catch {
+        data = undefined;
       }
 
-      const url = data.url;
+      if (!response.ok) {
+        const errMsg =
+          (data && typeof data === 'object' ? (data.error ?? data.message) : undefined) ??
+          (raw || undefined) ??
+          '上传失败';
+        throw new Error(`[${response.status}] ${String(errMsg)}`);
+      }
+
+      const url = data?.url;
+      if (typeof url !== 'string' || !url) {
+        throw new Error('上传失败：未返回 url');
+      }
       const newImg: ImageAsset = {
         id: Date.now().toString(),
         url: url,
@@ -240,7 +324,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background-light font-display">
-      <Header onOpenAuth={() => setView('cloudbase-auth')} onOpenCreations={() => setView('creations')} />
+      <Header onOpenCreations={() => setView('creations')} />
 
       <main className="flex flex-1 overflow-hidden">
         <Sidebar
@@ -269,12 +353,6 @@ const App: React.FC = () => {
           onBack={() => setView('main')}
           onRemove={removeFromGallery}
           onFileUpload={handleFileUpload}
-        />
-      )}
-
-      {view === 'cloudbase-auth' && (
-        <CloudbaseAuthPage
-          onBack={() => setView('main')}
         />
       )}
 

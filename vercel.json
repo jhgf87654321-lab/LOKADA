@@ -6,8 +6,8 @@
   "env": {
     "BETTER_AUTH_SECRET": "CaYKBEkHXr644oHKTKq7POcwnwOSftb2",
     "BETTER_AUTH_BASE_URL": "https://lokada.vercel.app",
-    "DATABASE_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
-    "DIRECT_URL": "postgresql://postgres:LOKADA63050563@db.gtfmcjjwdmteeftjfbtu.supabase.co:5432/postgres",
+    "DATABASE_URL": "postgresql://<username>:<password>@<cloudbase-postgres-host>:5432/<database>",
+    "DIRECT_URL": "postgresql://<username>:<password>@<cloudbase-postgres-host>:5432/<database>",
     "NEXT_PUBLIC_BASE_URL": "https://lokada.vercel.app",
     "NEXT_PUBLIC_CLOUDBASE_ENV": "@cloudbase-env",
     "NEXT_PUBLIC_CLOUDBASE_CLIENT_ID": "@cloudbase-client-id",

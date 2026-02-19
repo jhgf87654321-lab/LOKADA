@@ -33,7 +33,6 @@ const AuthPage: React.FC<AuthPageProps> = ({ onBack }) => {
         setError(response.error.message || '邮箱或密码错误');
       } else {
         router.push('/');
-        router.refresh();
       }
     } catch (err: any) {
       console.error('Auth error:', err);

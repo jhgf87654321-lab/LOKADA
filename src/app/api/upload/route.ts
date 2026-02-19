@@ -1,58 +1,115 @@
-import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
+import COS from 'cos-nodejs-sdk-v5';
+
+export const runtime = 'nodejs';
+
+const cos = new COS({
+  SecretId: process.env.COS_SECRET_ID!,
+  SecretKey: process.env.COS_SECRET_KEY!,
+});
+
+function putObject(params: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    cos.putObject(params, (err, data) => {
+      if (err) return reject(err);
+      resolve(data);
+    });
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const contentTypeHeader = request.headers.get("content-type") || "";
+    const filenameHeader = request.headers.get("x-file-name") || "upload";
 
-    if (!file) {
-      return NextResponse.json(
-        { error: '没有文件上传' },
-        { status: 400 }
-      );
-    }
-
-    // 验证文件类型
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: '只支持 JPG, PNG, WEBP, GIF 格式的图片' },
-        { status: 400 }
-      );
-    }
+    const arrayBuffer = await request.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     // 验证文件大小 (5MB)
     const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
+    if (buffer.length === 0) {
       return NextResponse.json(
-        { error: '文件大小不能超过 5MB' },
+        { error: "上传内容为空" },
+        { status: 400 }
+      );
+    }
+    if (buffer.length > maxSize) {
+      return NextResponse.json(
+        { error: "文件大小不能超过 5MB" },
         { status: 400 }
       );
     }
 
-    // 生成唯一文件名
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 8);
-    const extension = file.name.split('.').pop() || 'png';
+
+    const nameExt =
+      typeof filenameHeader === "string" && filenameHeader.includes(".")
+        ? filenameHeader.split(".").pop()
+        : undefined;
+
+    const mimeType = contentTypeHeader || "application/octet-stream";
+
+    const mimeExt =
+      mimeType.startsWith("image/jpeg") ? "jpg" :
+      mimeType.startsWith("image/png") ? "png" :
+      mimeType.startsWith("image/webp") ? "webp" :
+      mimeType.startsWith("image/gif") ? "gif" :
+      undefined;
+    const extension = nameExt || mimeExt || "png";
     const filename = `upload-${timestamp}-${randomId}.${extension}`;
 
-    // 上传到 Vercel Blob
-    const blob = await put(filename, file, {
-      access: 'public',
-    });
+    const Bucket = process.env.COS_BUCKET;
+    const Region = process.env.COS_REGION || 'ap-shanghai';
+
+    if (!Bucket || !Region) {
+      return NextResponse.json(
+        { error: 'COS 存储未配置，请设置 COS_BUCKET 和 COS_REGION 环境变量' },
+        { status: 500 }
+      );
+    }
+
+    const key = `uploads/${filename}`;
+
+    const params: any = {
+      Bucket,
+      Region,
+      Key: key,
+      Body: buffer,
+      ContentLength: buffer.length,
+      ContentType: mimeType || "image/png",
+      // 确保外部服务（如 Kie.ai）可以直接通过 URL 读取图片
+      ACL: process.env.COS_OBJECT_ACL || "public-read",
+    };
+
+    // 如果需要指定存储类型，可以通过环境变量 COS_STORAGE_CLASS 配置，
+    // 避免对多可用区（MAZ）存储桶强行使用单可用区的 StorageClass
+    if (process.env.COS_STORAGE_CLASS) {
+      params.StorageClass = process.env.COS_STORAGE_CLASS;
+    }
+
+    const result = await putObject(params);
+
+    const location: string = result.Location || '';
+    const url = location.startsWith('http')
+      ? location
+      : `https://${location}`;
 
     return NextResponse.json({
       success: true,
-      url: blob.url,
-      filename: blob.pathname,
-      size: file.size,
-      contentType: blob.contentType
+      url,
+      filename: key,
+      size: buffer.length,
+      contentType: mimeType || "image/png"
     });
   } catch (error: any) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      { error: `上传失败: ${error.message}` },
+      {
+        error: `上传失败: ${error?.message ?? String(error)}`,
+        name: error?.name,
+        code: error?.code,
+      },
       { status: 500 }
     );
   }

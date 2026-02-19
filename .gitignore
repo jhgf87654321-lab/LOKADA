@@ -38,3 +38,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# cloudfunctions (CloudBase 在部署时自动安装依赖)
+cloudfunctions/**/node_modules

@@ -41,3 +41,9 @@ next-env.d.ts
 
 # cloudfunctions (CloudBase 在部署时自动安装依赖)
 cloudfunctions/**/node_modules
+
+# Large files and tools (ffmpeg 等大文件不应提交到 Git)
+tools/
+ffmpeg-8.0.1/
+dt/
+*.zip

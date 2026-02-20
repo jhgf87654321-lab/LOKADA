@@ -29,9 +29,34 @@ export default function CloudbaseDashboardPage() {
   const syncInProgressRef = useRef(false);
 
   useEffect(() => {
+    // 在客户端检查环境变量
+    const env = process.env.NEXT_PUBLIC_CLOUDBASE_ENV;
+    const clientId = process.env.NEXT_PUBLIC_CLOUDBASE_CLIENT_ID;
+    const region = process.env.NEXT_PUBLIC_CLOUDBASE_REGION;
+    
+    console.log("[CloudBase Dashboard] 环境变量检查:", {
+      env,
+      clientId,
+      region,
+      hasWindow: typeof window !== "undefined",
+    });
+    
     const auth = getCloudbaseAuth();
     if (!auth) {
-      setError("CloudBase 未配置：请检查 NEXT_PUBLIC_CLOUDBASE_* 环境变量与控制台配置");
+      let errorMsg = "CloudBase 未配置：";
+      if (!env || !clientId) {
+        errorMsg += `请检查环境变量配置\n`;
+        errorMsg += `- NEXT_PUBLIC_CLOUDBASE_ENV: ${env || "未设置"}\n`;
+        errorMsg += `- NEXT_PUBLIC_CLOUDBASE_CLIENT_ID: ${clientId || "未设置"}\n`;
+        errorMsg += `- NEXT_PUBLIC_CLOUDBASE_REGION: ${region || "未设置"}\n\n`;
+        errorMsg += `提示：\n`;
+        errorMsg += `1. 本地开发：检查 .env 文件，确保变量以 NEXT_PUBLIC_ 开头，然后重启开发服务器\n`;
+        errorMsg += `2. 生产环境：在 CloudBase 控制台 → 云托管 → 配置 → 环境变量中设置\n`;
+        errorMsg += `3. 修改环境变量后需要重启开发服务器或重新部署`;
+      } else {
+        errorMsg += "未知错误，请查看浏览器控制台";
+      }
+      setError(errorMsg);
       setLoading(false);
       return;
     }

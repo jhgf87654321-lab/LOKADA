@@ -9,9 +9,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Use next build (no turbopack for stable standalone output in Docker)
+# Use webpack build (Turbopack font modules fail in Docker; --webpack forces stable bundler)
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npx next build
+RUN npm run build:webpack
 
 # Stage 3: Run
 FROM node:20-alpine AS runner

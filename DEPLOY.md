@@ -34,13 +34,66 @@ https://lokada-next-xxxx-xxxx.ap-shanghai.run.tcloudbase.com
 
 该地址即为线上访问链接。
 
-### 4. 环境变量
+### 4. 环境变量配置
 
-云托管需在控制台配置环境变量（数据库、CloudBase、COS、讯飞等）。部署后：
+**⚠️ 重要**：云托管需在控制台配置环境变量，否则应用无法正常运行。
 
-1. 打开 [CloudBase 控制台](https://console.cloud.tencent.com/tcb) → 云托管 → 选择服务
-2. 在「版本管理」或「配置」中设置环境变量
-3. 变量名与 `.env` 中一致，如：`DATABASE_URL`、`NEXT_PUBLIC_CLOUDBASE_ENV` 等
+#### 4.1 必需的环境变量
+
+部署前，必须在 CloudBase 控制台配置以下环境变量：
+
+**CloudBase 客户端配置（必需）：**
+- `NEXT_PUBLIC_CLOUDBASE_ENV` - CloudBase 环境 ID（如：`denglu-8gher1d52a21e6fe`）
+- `NEXT_PUBLIC_CLOUDBASE_CLIENT_ID` - CloudBase Client ID（通常与环境 ID 相同）
+- `NEXT_PUBLIC_CLOUDBASE_REGION` - 地域（如：`ap-shanghai`）
+
+**数据库配置（必需）：**
+- `DATABASE_URL` - 数据库连接字符串
+
+**其他服务配置（根据实际使用情况）：**
+- `XF_APPID`、`XF_API_KEY`、`XF_API_SECRET` - 讯飞语音识别
+- `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET`、`COS_REGION` - 腾讯云 COS
+- `KIE_AI_API_KEY` - KIE AI 服务
+- 其他服务端环境变量
+
+#### 4.2 在控制台配置步骤
+
+1. 打开 [CloudBase 控制台](https://console.cloud.tencent.com/tcb)
+2. 选择对应的环境（如 `denglu-8gher1d52a21e6fe`）
+3. 点击左侧菜单「云托管」
+4. 选择你的服务（如 `lokada-next`）
+5. 点击「配置」或「版本管理」标签页
+6. 找到「环境变量」部分
+7. 点击「添加环境变量」或「编辑」
+8. 逐个添加环境变量：
+   - **变量名**：必须与代码中完全一致（区分大小写）
+   - **变量值**：从 `.env` 文件中复制对应的值
+   - **作用域**：
+     - `NEXT_PUBLIC_*` 变量会被注入到客户端代码中
+     - 其他变量仅在服务端可用
+9. 保存配置
+10. **重要**：修改环境变量后，必须重新部署服务才能生效
+
+#### 4.3 验证环境变量配置
+
+部署前，可以使用以下命令检查环境变量配置：
+
+```bash
+npm run check:env
+```
+
+该脚本会检查：
+- 必需的环境变量是否已配置
+- 环境变量值是否为占位符（需要替换）
+- 环境变量名称是否正确
+
+#### 4.4 详细配置文档
+
+更多环境变量配置说明，请查看 [CLOUDBASE_ENV_CONFIG.md](./CLOUDBASE_ENV_CONFIG.md)，包括：
+- 完整的环境变量列表
+- 每个变量的说明和示例
+- 常见问题排查
+- 配置检查清单
 
 ### 5. 本地验证
 

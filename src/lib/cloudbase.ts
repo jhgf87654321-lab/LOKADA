@@ -14,9 +14,17 @@ const region = process.env.NEXT_PUBLIC_CLOUDBASE_REGION ?? "ap-shanghai";
 let appInstance: ReturnType<typeof cloudbase.init> | null = null;
 
 export function getCloudbaseApp() {
-  if (typeof window === "undefined") return null;
+  if (typeof window === "undefined") {
+    console.warn("[CloudBase] 服务端环境不支持 CloudBase 客户端 SDK");
+    return null;
+  }
   if (!env || !clientId) {
-    console.warn("[CloudBase] 环境变量未配置: NEXT_PUBLIC_CLOUDBASE_ENV 或 NEXT_PUBLIC_CLOUDBASE_CLIENT_ID");
+    console.warn("[CloudBase] 环境变量未配置:", {
+      env: env || "未设置",
+      clientId: clientId || "未设置",
+      region: region || "未设置",
+      hint: "请检查 .env 文件中的 NEXT_PUBLIC_CLOUDBASE_ENV 和 NEXT_PUBLIC_CLOUDBASE_CLIENT_ID",
+    });
     return null;
   }
   if (!appInstance) {

@@ -5,6 +5,6 @@
   "functionRoot": "./cloudfunctions",
   "functions": [],
   "cloudrun": {
-    "name": "denglu-8gher1d52a21e6fe"
+    "name": "lokada-next"
   }
 }

@@ -5,17 +5,19 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:webpack": "next dev",
-    "build": "next build --turbopack",
+    "build": "next build",
+    "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "check:env": "node scripts/check-env.js",
     "tcb:login": "tcb login",
     "tcb:env": "tcb env:use",
     "tcb:deploy": "tcb functions:deploy",
     "tcb:deploy:hello": "tcb functions:deploy hello",
-    "tcb:cloudrun": "tcb cloudrun deploy --port 3000"
+    "tcb:cloudrun": "tcb cloudrun deploy -e denglu-8gher1d52a21e6fe -s lokada-next --port 3000 --force"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^2.25.6",

@@ -4,12 +4,24 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getCloudbaseAuth } from "@/lib/cloudbase";
 
-function isCloudbaseLoggedIn(auth: unknown) {
-  const a = auth as any;
-  const hasState = a?.hasLoginState?.() ?? a?.isLoginState?.();
-  const u = a?.currentUser;
-  const hasIdentity = Boolean(u && (u.phoneNumber || u.email || u.username));
-  return Boolean(hasState && hasIdentity);
+/**
+ * 检查 CloudBase 登录状态
+ * 符合 CloudBase Web SDK 2.24.0+ 规范：使用 getUser() 和 getSession()
+ */
+async function isCloudbaseLoggedIn(auth: any): Promise<boolean> {
+  if (!auth) return false;
+  try {
+    const { data: sessionData } = await auth.getSession();
+    if (!sessionData?.session) return false;
+    
+    const { data: userData } = await auth.getUser();
+    if (!userData?.user) return false;
+    
+    const user = userData.user;
+    return Boolean(user.email || user.phone || user.user_metadata?.username);
+  } catch {
+    return false;
+  }
 }
 
 function normalizeCNPhone(input: string) {
@@ -46,12 +58,11 @@ export default function CloudbaseLoginPage() {
     // 不自动跳转（避免 login <-> dashboard 循环）；只显示提示条。
     const check = async () => {
       try {
-        const current = await Promise.race([
-          auth.getCurrentUser(),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+        const loggedIn = await Promise.race([
+          isCloudbaseLoggedIn(auth),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1200)),
         ]);
-        const uid = (current as any)?.uid ?? (current as any)?.sub;
-        setAlreadyLoggedIn(Boolean(uid));
+        setAlreadyLoggedIn(loggedIn);
       } catch {
         setAlreadyLoggedIn(false);
       }
@@ -92,15 +103,26 @@ export default function CloudbaseLoginPage() {
       }
 
       try {
-        // CloudBase 密码登录：使用 username 字段，值为手机号或邮箱
-        const username = loginMethod === "phone" 
-          ? normalizeCNPhone(phone)
-          : email.trim().toLowerCase();
-        
-        await auth.signIn({
-          username,
-          password: password.trim(),
-        } as any);
+        // 符合 CloudBase Web SDK 2.24.0+ 规范：使用 signInWithPassword()
+        let result;
+        if (loginMethod === "phone") {
+          const phoneNumber = normalizeCNPhone(phone);
+          // 使用手机号密码登录
+          result = await auth.signInWithPassword({
+            phone: phoneNumber,
+            password: password.trim(),
+          });
+        } else {
+          // 使用邮箱密码登录
+          result = await auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password: password.trim(),
+          });
+        }
+
+        if (result.error) {
+          throw new Error(result.error.message || "登录失败");
+        }
 
         router.replace("/cloudbase/dashboard");
       } catch (err: unknown) {
@@ -109,21 +131,22 @@ export default function CloudbaseLoginPage() {
             ? String((err as { message: string }).message)
             : "";
 
+        // 错误处理：根据错误信息提供友好的提示
         if (loginMethod === "phone") {
-          if (rawMsg.includes("provider phone not found") || rawMsg.includes("phone not found")) {
-            setError("手机号登录未启用：请在云开发控制台「身份认证」→「登录方式」启用「手机号密码登录」或「手机号验证码登录」");
-          } else if (rawMsg.includes("not_found") || rawMsg.includes("password_not_set")) {
+          if (rawMsg.includes("provider phone not found") || rawMsg.includes("phone not found") || rawMsg.includes("phone")) {
+            setError("手机号登录未启用：请在云开发控制台「身份认证」→「登录方式」启用「手机号密码登录」");
+          } else if (rawMsg.includes("not_found") || rawMsg.includes("password_not_set") || rawMsg.includes("Invalid")) {
             setError("手机号或密码错误");
           } else {
-            setError(rawMsg || "登录失败");
+            setError(rawMsg || "登录失败，请检查网络连接");
           }
         } else {
-          if (rawMsg.includes("provider email not found") || rawMsg.includes("email not found")) {
-            setError("邮箱登录未启用：请在云开发控制台「身份认证」→「登录方式」启用「邮箱密码登录」或「邮箱验证码登录」");
-          } else if (rawMsg.includes("not_found") || rawMsg.includes("password_not_set")) {
+          if (rawMsg.includes("provider email not found") || rawMsg.includes("email not found") || rawMsg.includes("email")) {
+            setError("邮箱登录未启用：请在云开发控制台「身份认证」→「登录方式」启用「邮箱密码登录」");
+          } else if (rawMsg.includes("not_found") || rawMsg.includes("password_not_set") || rawMsg.includes("Invalid")) {
             setError("邮箱或密码错误");
           } else {
-            setError(rawMsg || "登录失败");
+            setError(rawMsg || "登录失败，请检查网络连接");
           }
         }
       }

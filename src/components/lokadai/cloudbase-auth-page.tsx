@@ -11,12 +11,24 @@ interface CloudbaseAuthPageProps {
 
 type AuthMode = 'login' | 'register';
 
-function isCloudbaseLoggedIn(auth: unknown) {
-  const a = auth as any;
-  const hasState = a?.hasLoginState?.() ?? a?.isLoginState?.();
-  const u = a?.currentUser;
-  const hasIdentity = Boolean(u && (u.phoneNumber || u.email || u.username));
-  return Boolean(hasState && hasIdentity);
+/**
+ * 检查 CloudBase 登录状态（简化版本）
+ * 注意：完整检查应使用异步 getUser() 和 getSession()
+ */
+async function isCloudbaseLoggedIn(auth: any): Promise<boolean> {
+  if (!auth) return false;
+  try {
+    const { data: sessionData } = await auth.getSession();
+    if (!sessionData?.session) return false;
+    
+    const { data: userData } = await auth.getUser();
+    if (!userData?.user) return false;
+    
+    const user = userData.user;
+    return Boolean(user.email || user.phone || user.user_metadata?.username);
+  } catch {
+    return false;
+  }
 }
 
 export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
@@ -26,9 +38,16 @@ export default function CloudbaseAuthPage({ onBack }: CloudbaseAuthPageProps) {
   // Check if already logged in
   useEffect(() => {
     const auth = getCloudbaseAuth();
-    if (isCloudbaseLoggedIn(auth)) {
-      router.push('/');
-    }
+    if (!auth) return;
+    
+    const check = async () => {
+      const loggedIn = await isCloudbaseLoggedIn(auth);
+      if (loggedIn) {
+        router.push('/');
+      }
+    };
+    
+    void check();
   }, [router]);
 
   return (

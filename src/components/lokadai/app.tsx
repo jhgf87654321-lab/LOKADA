@@ -48,19 +48,31 @@ function isCloudbaseLoggedIn(auth: unknown) {
   }
 }
 
+/**
+ * 确保 CloudBase 已登录
+ * 符合 CloudBase Web SDK 2.24.0+ 规范：使用 getUser() 和 getSession()
+ */
 async function ensureCloudbaseLoggedIn(): Promise<boolean> {
   const auth = getCloudbaseAuth();
   if (!auth) return false;
-  if (isCloudbaseLoggedIn(auth)) return true;
-
-  // getLoginState/currentUser 可能还没就绪，这里用 getCurrentUser 兜底一次（带软超时）
+  
   try {
-    const current = await Promise.race([
-      auth.getCurrentUser(),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+    // 检查会话
+    const { data: sessionData } = await Promise.race([
+      auth.getSession(),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 1200)),
     ]);
-    const u = current as any;
-    return Boolean(u && (u.phoneNumber || u.email || u.username));
+    if (!sessionData?.session) return false;
+    
+    // 检查用户信息
+    const { data: userData } = await Promise.race([
+      auth.getUser(),
+      new Promise<{ data: null }>((resolve) => setTimeout(() => resolve({ data: null }), 1200)),
+    ]);
+    if (!userData?.user) return false;
+    
+    const user = userData.user;
+    return Boolean(user.email || user.phone || user.user_metadata?.username);
   } catch {
     return false;
   }

@@ -10,21 +10,29 @@ interface HeaderProps {
   onOpenCreations?: () => void;
 }
 
-function isCloudbaseLoggedIn(auth: unknown) {
-  const a = auth as any;
-  if (!a) return false;
+/**
+ * 检查 CloudBase 登录状态（异步版本）
+ * 符合 CloudBase Web SDK 2.24.0+ 规范：使用 getUser() 和 getSession()
+ */
+async function isCloudbaseLoggedIn(auth: any): Promise<boolean> {
+  if (!auth) return false;
   try {
-    const state = a.getLoginState?.();
-    if (!state) return false;
-    const provider = state.credential?.provider;
-    if (provider && String(provider).toLowerCase() === "anonymous") {
-      return false;
-    }
-    const user = state.user || a.currentUser;
-    const hasIdentity = Boolean(user && (user.phoneNumber || user.email || user.username));
-    return hasIdentity;
+    // 先检查会话
+    const { data: sessionData } = await auth.getSession();
+    if (!sessionData?.session) return false;
+    
+    // 再检查用户信息
+    const { data: userData } = await auth.getUser();
+    if (!userData?.user) return false;
+    
+    const user = userData.user;
+    // 确保不是匿名用户
+    if (user.is_anonymous) return false;
+    
+    // 确保有有效的用户标识
+    return Boolean(user.id && (user.email || user.phone || user.user_metadata?.username));
   } catch {
-    return Boolean(a?.hasLoginState?.() ?? a?.isLoginState?.());
+    return false;
   }
 }
 
@@ -64,57 +72,96 @@ const Header: React.FC<HeaderProps> = ({ onOpenCreations }) => {
 
   useEffect(() => {
     const auth = getCloudbaseAuth();
-    if (!auth) return;
+    if (!auth) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
 
     // Check Cloudbase auth state
     const checkAuth = async () => {
-      // 每次检查前，立即结束 loading，避免页面“卡死”
-      setIsLoading(false);
+      setIsLoading(true);
       try {
-        if (isCloudbaseLoggedIn(auth)) {
-          // 避免 getCurrentUser 长时间挂起导致 UI 无响应：加一个软超时
-          const userInfo = await Promise.race([
-            auth.getCurrentUser(),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
-          ]);
-          if (userInfo) {
-            const userData = userInfo as any;
-            setUser({
-              uid: userData.uid || userData.sub || '',
-              email: userData.email,
-              displayName: userData.displayName || userData.name || userData.email?.split('@')[0] || userData.username || '用户'
-            });
-          } else {
+        // 符合 CloudBase Web SDK 2.24.0+ 规范：先检查登录状态
+        const loggedIn = await isCloudbaseLoggedIn(auth);
+        
+        if (!loggedIn) {
+          setUser(null);
+          setIsLoading(false);
+          return;
+        }
+
+        // 如果已登录，获取用户详细信息
+        const { data: userData, error: userError } = await Promise.race([
+          auth.getUser(),
+          new Promise<{ data: null; error: { message: string } }>((resolve) => 
+            setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 1500)
+          ),
+        ]);
+        
+        if (!userError && userData?.user) {
+          const user = userData.user;
+          // 再次确认不是匿名用户
+          if (user.is_anonymous) {
             setUser(null);
+            setIsLoading(false);
+            return;
           }
+          
+          // 确保有有效的用户 ID
+          if (!user.id) {
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          
+          setUser({
+            uid: String(user.id), // CloudBase Web SDK 2.24.0+ 使用 user.id
+            email: user.email || '',
+            displayName: user.user_metadata?.nickName || user.user_metadata?.name || user.email?.split('@')[0] || user.user_metadata?.username || '用户'
+          });
         } else {
           setUser(null);
         }
       } catch (error) {
         console.error("获取用户信息失败:", error);
         setUser(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
+    // 初始检查
     void checkAuth();
 
-    // Listen for auth state changes，防抖避免 SDK 连续触发导致请求风暴
-    const handler = () => {
+    // 符合 CloudBase Web SDK 2.24.0+ 规范：使用 onAuthStateChange 监听认证状态变化
+    // 防抖避免 SDK 连续触发导致请求风暴
+    const handler = (event: string) => {
       if (checkAuthRef.current) clearTimeout(checkAuthRef.current);
       checkAuthRef.current = setTimeout(() => {
         checkAuthRef.current = null;
-        void checkAuth();
+        // 当退出登录时，立即清除用户状态
+        if (event === "SIGNED_OUT") {
+          setUser(null);
+          setIsLoading(false);
+          purgeCloudbaseLocalState();
+        } else {
+          void checkAuth();
+        }
       }, 300);
     };
 
-    const unsubscribe: (() => void) | undefined =
-      (auth as any).onLoginStateChange?.(handler) ??
-      (auth as any).onLoginStateChanged?.(handler);
+    // 使用新版 onAuthStateChange API
+    const { data: unsubscribeData } = auth.onAuthStateChange((event, session, info) => {
+      handler(event);
+    });
     
     return () => {
       if (checkAuthRef.current) clearTimeout(checkAuthRef.current);
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
+      try {
+        unsubscribeData?.subscription?.unsubscribe?.();
+      } catch {
+        // ignore
       }
     };
   }, []);
@@ -135,25 +182,43 @@ const Header: React.FC<HeaderProps> = ({ onOpenCreations }) => {
 
   const handleSignOut = async () => {
     const auth = getCloudbaseAuth();
-    // 先更新 UI，避免 signOut 网络挂起导致“卡死”
+    // 先更新 UI，避免 signOut 网络挂起导致"卡死"
     setShowDropdown(false);
     setUser(null);
+    setIsLoading(false);
 
     if (auth) {
       try {
-        await Promise.race([
+        // 符合 CloudBase Web SDK 2.24.0+ 规范：signOut()
+        const result = await Promise.race([
           auth.signOut(),
-          new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+          new Promise<{ error?: { message: string } }>((resolve) => 
+            setTimeout(() => resolve({ error: { message: "timeout" } }), 1500)
+          ),
         ]);
+        
+        // 检查是否有错误
+        if (result && typeof result === 'object' && 'error' in result && result.error) {
+          console.error("退出登录失败:", result.error);
+        }
       } catch (err) {
         console.error("退出登录失败:", err);
       }
     }
-    // 兜底清理：防止 CloudBase 本地残留导致“半退出”从而产生重定向循环
+    
+    // 兜底清理：防止 CloudBase 本地残留导致"半退出"从而产生重定向循环
     purgeCloudbaseLocalState();
-    // 退出后返回首页；若已在首页则不再执行 replace，避免触发重复请求
+    
+    // 强制清除用户状态（防止状态不同步）
+    setUser(null);
+    setIsLoading(false);
+    
+    // 退出后返回首页；若已在首页则刷新页面以清除可能的状态
     if (pathname !== "/") {
       router.replace("/");
+    } else {
+      // 如果在首页，强制刷新以清除可能的状态
+      router.refresh();
     }
   };
 

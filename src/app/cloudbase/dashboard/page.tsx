@@ -13,12 +13,24 @@ type UserInfo = {
   displayName?: string;
 };
 
-function isCloudbaseLoggedIn(auth: unknown) {
-  const a = auth as any;
-  const hasState = a?.hasLoginState?.() ?? a?.isLoginState?.();
-  const u = a?.currentUser;
-  const hasIdentity = Boolean(u && (u.phoneNumber || u.email || u.username));
-  return Boolean(hasState && hasIdentity);
+/**
+ * 检查 CloudBase 登录状态
+ * 符合 CloudBase Web SDK 2.24.0+ 规范：使用 getUser() 和 getSession()
+ */
+async function isCloudbaseLoggedIn(auth: any): Promise<boolean> {
+  if (!auth) return false;
+  try {
+    const { data: sessionData } = await auth.getSession();
+    if (!sessionData?.session) return false;
+    
+    const { data: userData } = await auth.getUser();
+    if (!userData?.user) return false;
+    
+    const user = userData.user;
+    return Boolean(user.email || user.phone || user.user_metadata?.username);
+  } catch {
+    return false;
+  }
 }
 
 export default function CloudbaseDashboardPage() {
@@ -65,29 +77,34 @@ export default function CloudbaseDashboardPage() {
       if (syncInProgressRef.current) return;
       syncInProgressRef.current = true;
       try {
-        if (!isCloudbaseLoggedIn(auth)) {
+        const loggedIn = await isCloudbaseLoggedIn(auth);
+        if (!loggedIn) {
           setUser(null);
           setLoading(false);
           return;
         }
-        const current = await auth.getCurrentUser();
-        if (!current) {
+        // 符合 CloudBase Web SDK 2.24.0+ 规范：使用 getUser() 获取用户信息
+        const { data: userData, error: userError } = await auth.getUser();
+        if (userError || !userData?.user) {
           setUser(null);
           setLoading(false);
           return;
         }
-        const uid = (current as any)?.uid;
+        
+        const user = userData.user;
+        const uid = user.id; // CloudBase Web SDK 2.24.0+ 使用 user.id
         if (!uid) {
           setUser(null);
           setLoading(false);
           return;
         }
+        
         setUser({
           uid: String(uid),
-          username: (current as any).username,
-          phoneNumber: (current as any).phoneNumber,
-          email: (current as any).email,
-          displayName: (current as any).displayName,
+          username: user.user_metadata?.username || user.user_metadata?.nickName,
+          phoneNumber: user.phone,
+          email: user.email,
+          displayName: user.user_metadata?.nickName || user.user_metadata?.name,
         });
       } catch (e: unknown) {
         const msg =
@@ -102,12 +119,17 @@ export default function CloudbaseDashboardPage() {
     };
 
     sync();
-    const unsubscribe =
-      (auth as any).onLoginStateChange?.(() => sync()) ??
-      (auth as any).onLoginStateChanged?.(() => sync());
+    // 符合 CloudBase Web SDK 2.24.0+ 规范：使用 onAuthStateChange 监听认证状态变化
+    const { data: unsubscribeData } = auth.onAuthStateChange((event, session, info) => {
+      // 当登录状态变化时，同步用户信息
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        sync();
+      }
+    });
     return () => {
       try {
-        unsubscribe?.();
+        // onAuthStateChange 返回 { data: { subscription: { unsubscribe: () => void } } }
+        unsubscribeData?.subscription?.unsubscribe?.();
       } catch {
         // ignore
       }
@@ -118,6 +140,7 @@ export default function CloudbaseDashboardPage() {
     const auth = getCloudbaseAuth();
     if (!auth) return;
     try {
+      // 符合 CloudBase Web SDK 2.24.0+ 规范：signOut() 可能返回 { data, error } 或 void
       await Promise.race([
         auth.signOut(),
         new Promise<void>((resolve) => setTimeout(resolve, 1500)),

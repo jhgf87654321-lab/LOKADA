@@ -124,7 +124,6 @@ async function uploadToCos(buffer: Buffer): Promise<string | null> {
         Key: key,
         Body: buffer,
         ContentType: "audio/webm",
-        ACL: process.env.COS_OBJECT_ACL || "public-read",
       },
       (err, data) => {
         if (err) return reject(err);

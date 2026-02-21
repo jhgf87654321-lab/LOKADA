@@ -5,11 +5,11 @@ const KIE_AI_API_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY!;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const headersList = await headers();
     console.log("API Headers:", headersList.get("cookie"));
-    const body = await request.json();
+    const body = await _request.json();
 
     const {
       prompt,
@@ -30,6 +30,13 @@ export async function POST(request: NextRequest) {
     const imageInput = originalImageUrl ? [originalImageUrl] : [];
 
     // Call Kie.ai API to create task
+    if (!KIE_AI_API_KEY || KIE_AI_API_KEY.startsWith("你的") || KIE_AI_API_KEY.includes("API Key")) {
+      return NextResponse.json(
+        { error: "KIE_AI_API_KEY 未配置或为占位符，请设置真实的 API Key" },
+        { status: 500 }
+      );
+    }
+
     const kieResponse = await fetch(KIE_AI_API_URL, {
       method: "POST",
       headers: {

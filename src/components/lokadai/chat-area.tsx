@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Role } from './types';
 import { MaterialIcon, Icons } from './material-icon';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { toBlobURL } from '@ffmpeg/util';
 
 interface ChatAreaProps {
   messages: Message[];
@@ -11,7 +13,52 @@ interface ChatAreaProps {
   onFileUpload: (file: File) => void;
 }
 
-type VoiceStatus = 'idle' | 'listening' | 'stopped' | 'error';
+type VoiceStatus = 'idle' | 'listening' | 'processing' | 'stopped' | 'error';
+
+let ffmpeg: FFmpeg | null = null;
+
+/** 初始化 FFmpeg（浏览器版本） */
+async function getFFmpeg(): Promise<FFmpeg> {
+  if (ffmpeg) return ffmpeg;
+
+  ffmpeg = new FFmpeg();
+
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+
+  return ffmpeg;
+}
+
+/** 使用 FFmpeg 将 webm 转成 16k PCM */
+async function transcodeWebmToPcm16k(webmBlob: Blob): Promise<ArrayBuffer> {
+  const ff = await getFFmpeg();
+
+  // 读取 webm 文件
+  const webmBuffer = await webmBlob.arrayBuffer();
+  await ff.writeFile("input.webm", new Uint8Array(webmBuffer));
+
+  // 转换为 16kHz PCM
+  await ff.exec([
+    "-i", "input.webm",
+    "-f", "s16le",
+    "-acodec", "pcm_s16le",
+    "-ac", "1",
+    "-ar", "16000",
+    "output.pcm"
+  ]);
+
+  // 读取输出
+  const outputData = await ff.readFile("output.pcm");
+
+  // 清理
+  await ff.deleteFile("input.webm");
+  await ff.deleteFile("output.pcm");
+
+  return (outputData as Uint8Array).buffer as ArrayBuffer;
+}
 
 const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerating, onFileUpload }) => {
   const [input, setInput] = useState('');
@@ -59,11 +106,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
 
         if (!blob.size) return;
 
+        // 显示处理中状态
+        setVoiceStatus('processing');
+        setInterimTranscript('正在转码音频...');
+
         try {
-          // 上传到后端 /api/asr
+          // 使用 FFmpeg 在浏览器端转码为 PCM
+          const pcmBuffer = await transcodeWebmToPcm16k(blob);
+
+          // 发送 PCM 数据到后端
           const res = await fetch('/api/asr', {
             method: 'POST',
-            body: blob,
+            body: pcmBuffer,
+            headers: {
+              'Content-Type': 'audio/pcm'
+            }
           });
           const data = await res.json();
 
@@ -71,13 +128,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
             setInput((prev) => prev + data.text);
           } else if (data?.error) {
             console.error('ASR error:', data.error, data?.details);
-            // 可选：在 UI 上显示错误提示
             setInterimTranscript(`识别失败: ${data.error}`);
           }
         } catch (e) {
-          console.error('上传音频或识别失败:', e);
+          console.error('转码或识别失败:', e);
+          setInterimTranscript(`处理失败: ${e instanceof Error ? e.message : '未知错误'}`);
         } finally {
-          // 停掉麦克风
+          setVoiceStatus('idle');
           stream.getTracks().forEach((t) => t.stop());
         }
       };
@@ -186,7 +243,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
               {voiceStatus === 'listening' && (
                 <span className="absolute inset-0 rounded-full animate-ping bg-primary/30"></span>
               )}
-              <Icons.Mic />
+              {voiceStatus === 'processing' ? <span className="animate-spin">⏳</span> : <Icons.Mic />}
             </button>
             <div className="flex-1 relative">
               <textarea
@@ -199,7 +256,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
                   }
                 }}
                 className="w-full bg-transparent border-none focus:ring-0 text-sm py-2 px-2 resize-none custom-scrollbar"
-                placeholder={voiceStatus === 'listening' ? '正在聆听...' : "描述您的设计想法，或点击图片图标上传..."}
+                placeholder={voiceStatus === 'listening' ? '正在聆听...' : voiceStatus === 'processing' ? '正在处理...' : "描述您的设计想法，或点击图片图标上传..."}
                 rows={1}
               />
             </div>

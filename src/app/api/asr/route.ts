@@ -10,14 +10,16 @@ const API_SECRET = process.env.XF_API_SECRET!;
 
 let ffmpeg: FFmpeg | null = null;
 
-/** 初始化 FFmpeg（WebAssembly 版本） */
+/** 初始化 FFmpeg（Node.js 版本） */
 async function getFFmpeg(): Promise<FFmpeg> {
   if (ffmpeg) return ffmpeg;
 
   ffmpeg = new FFmpeg();
 
-  // 加载 FFmpeg 核心文件（从 CDN 获取）
+  // Node.js 环境下加载 FFmpeg 核心
   const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+
+  // 使用 nodeLoad 而不是 load（适用于 Node.js）
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
@@ -92,11 +94,9 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
     let hasError = false;
 
     ws.on("open", () => {
-      // 第一帧：发送 common + business + data（status=0）
+      // 第一帧
       const firstFrame = {
-        common: {
-          app_id: APPID,
-        },
+        common: { app_id: APPID },
         business: {
           language: "zh_cn",
           domain: "iat",
@@ -112,85 +112,53 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
       };
       ws.send(JSON.stringify(firstFrame));
 
-      // 中间帧：分帧发送音频（每帧1280字节，status=1）
+      // 中间帧
       const frameSize = 1280;
       let offset = 1280;
       while (offset < pcmBuffer.length) {
         const chunk = Buffer.from(pcmBuffer.subarray(offset, offset + frameSize));
-        const frame = {
-          data: {
-            status: 1,
-            format: "audio/L16;rate=16000",
-            encoding: "raw",
-            audio: chunk.toString("base64"),
-          },
-        };
-        ws.send(JSON.stringify(frame));
+        ws.send(JSON.stringify({
+          data: { status: 1, format: "audio/L16;rate=16000", encoding: "raw", audio: chunk.toString("base64") }
+        }));
         offset += frameSize;
       }
 
-      // 最后一帧：发送结束标识（status=2）
-      const lastFrame = {
-        data: {
-          status: 2,
-        },
-      };
-      ws.send(JSON.stringify(lastFrame));
+      // 最后一帧
+      ws.send(JSON.stringify({ data: { status: 2 } }));
     });
 
     ws.on("message", (data: WebSocket.Data) => {
       try {
         const json = JSON.parse(data.toString());
-
         if (json.code !== 0) {
           hasError = true;
-          console.error("iFlytek ASR error:", JSON.stringify(json, null, 2));
           ws.close();
-          reject(new Error(json.message || json.desc || `code: ${json.code}`));
+          reject(new Error(json.message || `code: ${json.code}`));
           return;
         }
-
-        // 解析识别结果
         if (json.data?.result?.ws) {
-          let text = "";
           for (const item of json.data.result.ws) {
             for (const cw of item.cw ?? []) {
-              if (cw.w) text += cw.w;
+              if (cw.w) fullText += cw.w;
             }
           }
-          fullText += text;
         }
-
-        // 检查是否结束
         if (json.data?.status === 2) {
           ws.close();
           resolve(fullText);
         }
       } catch (e) {
-        console.error("Parse WebSocket message error:", e);
+        console.error("Parse error:", e);
       }
     });
 
-    ws.on("error", (error) => {
-      hasError = true;
-      console.error("WebSocket error:", error);
-      reject(error);
+    ws.on("error", (err) => { hasError = true; reject(err); });
+    ws.on("close", (code) => {
+      if (!hasError && code !== 1000) reject(new Error(`WS closed: ${code}`));
     });
 
-    ws.on("close", (code, reason) => {
-      if (!hasError && code !== 1000) {
-        reject(new Error(`WebSocket closed unexpectedly: ${code} ${reason}`));
-      }
-    });
-
-    // 设置超时（60秒）
     setTimeout(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-        if (!hasError) {
-          reject(new Error("WebSocket timeout"));
-        }
-      }
+      if (ws.readyState === WebSocket.OPEN) { ws.close(); reject(new Error("timeout")); }
     }, 60000);
   });
 }
@@ -202,18 +170,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "empty audio" }, { status: 400 });
     }
 
-    // 使用 FFmpeg WebAssembly 将 webm/opus 转成 16k 单声道 PCM
     const pcmBuffer = await transcodeWebmToPcm16k(webmBuffer);
-
-    // 通过 WebSocket 发送音频并获取识别结果
     const text = await recognizeAudioViaWebSocket(pcmBuffer);
 
     return NextResponse.json({ text });
   } catch (e: any) {
-    console.error("ASR internal error:", e);
-    return NextResponse.json(
-      { error: e?.message ?? "internal error", details: {} },
-      { status: 500 },
-    );
+    console.error("ASR error:", e);
+    return NextResponse.json({ error: e?.message ?? "error" }, { status: 500 });
   }
 }

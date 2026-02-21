@@ -39,18 +39,28 @@ const REQUIRED_ENV_VARS = {
     required: false,
     scope: 'server',
   },
-  'XF_APPID': {
-    description: '讯飞语音 APPID',
+  'DASHSCOPE_API_KEY': {
+    description: '阿里云百炼 DashScope API Key（Paraformer 语音识别，支持 webm）',
     required: false,
     scope: 'server',
   },
-  'XF_API_KEY': {
-    description: '讯飞语音 API Key',
+  'BLOB_READ_WRITE_TOKEN': {
+    description: 'Vercel Blob 读写 Token（ASR 临时存储音频）',
     required: false,
     scope: 'server',
   },
-  'XF_API_SECRET': {
-    description: '讯飞语音 API Secret',
+  'ALIYUN_ACCESS_KEY_ID': {
+    description: '阿里云 AccessKey ID（已弃用，ASR 改用 DashScope）',
+    required: false,
+    scope: 'server',
+  },
+  'ALIYUN_ACCESS_KEY_SECRET': {
+    description: '阿里云 AccessKey Secret（已弃用）',
+    required: false,
+    scope: 'server',
+  },
+  'ALIYUN_NLS_APPKEY': {
+    description: '阿里云智能语音 Appkey（已弃用）',
     required: false,
     scope: 'server',
   },

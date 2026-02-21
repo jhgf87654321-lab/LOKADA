@@ -28,9 +28,8 @@
 
 | 变量名 | 说明 | 示例值 | 作用域 |
 |--------|------|--------|--------|
-| `XF_APPID` | 讯飞语音 APPID | `your-xf-appid` | 服务端 |
-| `XF_API_KEY` | 讯飞语音 API Key | `your-xf-api-key` | 服务端 |
-| `XF_API_SECRET` | 讯飞语音 API Secret | `your-xf-api-secret` | 服务端 |
+| `DASHSCOPE_API_KEY` | 阿里云百炼 DashScope API Key（Paraformer 语音识别，支持 webm） | `sk-xxx` | 服务端 |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob Token（ASR 临时存储音频，需与 DASHSCOPE 配合） | `vercel_blob_rw_...` | 服务端 |
 | `COS_SECRET_ID` | 腾讯云 COS Secret ID | `your-cos-secret-id` | 服务端 |
 | `COS_SECRET_KEY` | 腾讯云 COS Secret Key | `your-cos-secret-key` | 服务端 |
 | `COS_BUCKET` | COS 存储桶名称 | `your-bucket-name` | 服务端 |
@@ -171,7 +170,7 @@ npm run check:env
 - [ ] `NEXT_PUBLIC_CLOUDBASE_CLIENT_ID` 已设置
 - [ ] `NEXT_PUBLIC_CLOUDBASE_REGION` 已设置
 - [ ] `DATABASE_URL` 已设置（如使用数据库）
-- [ ] `XF_APPID`、`XF_API_KEY`、`XF_API_SECRET` 已设置（如使用语音识别）
+- [ ] `DASHSCOPE_API_KEY`、`BLOB_READ_WRITE_TOKEN` 已设置（如使用语音识别）
 - [ ] `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET` 已设置（如使用 COS）
 - [ ] 所有变量名与 `.env` 文件中的一致
 - [ ] 已保存配置

@@ -3,8 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Role } from './types';
 import { MaterialIcon, Icons } from './material-icon';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
 
 interface ChatAreaProps {
   messages: Message[];
@@ -14,51 +12,6 @@ interface ChatAreaProps {
 }
 
 type VoiceStatus = 'idle' | 'listening' | 'processing' | 'stopped' | 'error';
-
-let ffmpeg: FFmpeg | null = null;
-
-/** 初始化 FFmpeg（浏览器版本） */
-async function getFFmpeg(): Promise<FFmpeg> {
-  if (ffmpeg) return ffmpeg;
-
-  ffmpeg = new FFmpeg();
-
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-  });
-
-  return ffmpeg;
-}
-
-/** 使用 FFmpeg 将 webm 转成 16k PCM */
-async function transcodeWebmToPcm16k(webmBlob: Blob): Promise<ArrayBuffer> {
-  const ff = await getFFmpeg();
-
-  // 读取 webm 文件
-  const webmBuffer = await webmBlob.arrayBuffer();
-  await ff.writeFile("input.webm", new Uint8Array(webmBuffer));
-
-  // 转换为 16kHz PCM
-  await ff.exec([
-    "-i", "input.webm",
-    "-f", "s16le",
-    "-acodec", "pcm_s16le",
-    "-ac", "1",
-    "-ar", "16000",
-    "output.pcm"
-  ]);
-
-  // 读取输出
-  const outputData = await ff.readFile("output.pcm");
-
-  // 清理
-  await ff.deleteFile("input.webm");
-  await ff.deleteFile("output.pcm");
-
-  return (outputData as Uint8Array).buffer as ArrayBuffer;
-}
 
 const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerating, onFileUpload }) => {
   const [input, setInput] = useState('');
@@ -108,18 +61,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
 
         // 显示处理中状态
         setVoiceStatus('processing');
-        setInterimTranscript('正在转码音频...');
+        setInterimTranscript('正在识别...');
 
         try {
-          // 使用 FFmpeg 在浏览器端转码为 PCM
-          const pcmBuffer = await transcodeWebmToPcm16k(blob);
-
-          // 发送 PCM 数据到后端
+          // 直接上传 webm，由服务端转码并调用阿里云识别（避免浏览器端 @ffmpeg 与 Turbopack 冲突）
           const res = await fetch('/api/asr', {
             method: 'POST',
-            body: pcmBuffer,
+            body: blob,
             headers: {
-              'Content-Type': 'audio/pcm'
+              'Content-Type': 'audio/webm'
             }
           });
           const data = await res.json();
@@ -128,7 +78,8 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
             setInput((prev) => prev + data.text);
           } else if (data?.error) {
             console.error('ASR error:', data.error, data?.details);
-            setInterimTranscript(`识别失败: ${data.error}`);
+            const hint = data?.details ? `（详见控制台 details）` : '';
+            setInterimTranscript(`识别失败: ${data.error}${hint}`);
           }
         } catch (e) {
           console.error('转码或识别失败:', e);

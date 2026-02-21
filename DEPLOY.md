@@ -51,7 +51,7 @@ https://lokada-next-xxxx-xxxx.ap-shanghai.run.tcloudbase.com
 - `DATABASE_URL` - 数据库连接字符串
 
 **其他服务配置（根据实际使用情况）：**
-- `XF_APPID`、`XF_API_KEY`、`XF_API_SECRET` - 讯飞语音识别
+- `DASHSCOPE_API_KEY`、`BLOB_READ_WRITE_TOKEN` - 阿里云百炼语音识别（Paraformer，支持 webm）
 - `COS_SECRET_ID`、`COS_SECRET_KEY`、`COS_BUCKET`、`COS_REGION` - 腾讯云 COS
 - `KIE_AI_API_KEY` - KIE AI 服务
 - 其他服务端环境变量

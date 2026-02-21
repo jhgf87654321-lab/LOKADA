@@ -74,7 +74,35 @@ https://lokada-next-xxxx-xxxx.ap-shanghai.run.tcloudbase.com
 9. 保存配置
 10. **重要**：修改环境变量后，必须重新部署服务才能生效
 
-#### 4.3 验证环境变量配置
+#### 4.3 CloudBase Run 构建参数（关键）
+
+`NEXT_PUBLIC_*` 变量在 **构建时** 内联到客户端代码，运行时才设置的环境变量不会生效。因此必须在 **构建阶段** 传入这些值。
+
+**方法一：在 CloudBase Run 构建配置中设置构建参数**
+
+1. 云托管 → 服务管理 → 选择服务 → 构建配置
+2. 在「构建参数」或「Docker 构建参数」中添加：
+   - `NEXT_PUBLIC_CLOUDBASE_ENV` = 你的环境 ID
+   - `NEXT_PUBLIC_CLOUDBASE_REGION` = `ap-shanghai`
+   - `NEXT_PUBLIC_CLOUDBASE_CLIENT_ID` = 你的 Client ID
+   - `NEXT_PUBLIC_CLOUDBASE_ACCESS_KEY` = 你的 Access Key（或与 Client ID 相同）
+
+**方法二：本地构建时传入**
+
+```bash
+docker build \
+  --build-arg NEXT_PUBLIC_CLOUDBASE_ENV=your-env-id \
+  --build-arg NEXT_PUBLIC_CLOUDBASE_REGION=ap-shanghai \
+  --build-arg NEXT_PUBLIC_CLOUDBASE_CLIENT_ID=your-client-id \
+  --build-arg NEXT_PUBLIC_CLOUDBASE_ACCESS_KEY=your-access-key \
+  -t lokada-next .
+```
+
+**方法三：使用 .env.production（本地/CI 构建）**
+
+项目根目录创建 `.env.production`，内容与 `.env` 中 CloudBase 相关变量一致。`npm run build` 时会自动加载，构建产物会包含这些值。注意不要将真实密钥提交到 Git。
+
+#### 4.5 验证环境变量配置
 
 部署前，可以使用以下命令检查环境变量配置：
 
@@ -87,7 +115,7 @@ npm run check:env
 - 环境变量值是否为占位符（需要替换）
 - 环境变量名称是否正确
 
-#### 4.4 详细配置文档
+#### 4.6 详细配置文档
 
 更多环境变量配置说明，请查看 [CLOUDBASE_ENV_CONFIG.md](./CLOUDBASE_ENV_CONFIG.md)，包括：
 - 完整的环境变量列表

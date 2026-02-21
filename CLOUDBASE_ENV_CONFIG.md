@@ -12,7 +12,10 @@
 |--------|------|--------|--------|
 | `NEXT_PUBLIC_CLOUDBASE_ENV` | CloudBase 环境 ID | `denglu-8gher1d52a21e6fe` | 客户端 |
 | `NEXT_PUBLIC_CLOUDBASE_CLIENT_ID` | CloudBase Client ID | `denglu-8gher1d52a21e6fe` | 客户端 |
+| `NEXT_PUBLIC_CLOUDBASE_ACCESS_KEY` | CloudBase Publishable Key（推荐） | `your-publishable-key` | 客户端 |
 | `NEXT_PUBLIC_CLOUDBASE_REGION` | 地域 | `ap-shanghai` | 客户端 |
+
+**注意**: `NEXT_PUBLIC_CLOUDBASE_ACCESS_KEY` 是 CloudBase Web SDK 2.24.0+ 必需的配置项。如果未设置，代码会使用 `NEXT_PUBLIC_CLOUDBASE_CLIENT_ID` 作为 fallback，但建议明确配置 `ACCESS_KEY`。
 
 ### 2. 数据库配置（必需）
 

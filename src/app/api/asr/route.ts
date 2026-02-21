@@ -3,23 +3,29 @@ import crypto from "crypto";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
-import ffmpegPath from "ffmpeg-static";
+import ffmpegPath from "@ffmpeg-installer/ffmpeg";
 import WebSocket from "ws";
 
 const APPID = process.env.XF_APPID!;
 const API_KEY = process.env.XF_API_KEY!;
 const API_SECRET = process.env.XF_API_SECRET!;
 
-/** 解析 ffmpeg 可执行文件路径（兼容 Turbopack 下 ffmpeg-static 返回异常路径的情况） */
+/** 解析 ffmpeg 可执行文件路径（兼容 Vercel Serverless 环境） */
 function getFfmpegBin(): string {
   const envPath = process.env.FFMPEG_PATH;
   if (envPath && fs.existsSync(envPath)) return envPath;
 
-  const fromPkg = ffmpegPath as string | null | undefined;
-  if (fromPkg && fs.existsSync(fromPkg)) return fromPkg;
+  // @ffmpeg-installer/ffmpeg 返回 { path, version, url }
+  const ffmpegInstaller = ffmpegPath as { path: string; version: string; url: string };
+  if (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) return ffmpegInstaller.path;
 
-  const cwdFallback = path.join(process.cwd(), "node_modules", "ffmpeg-static", "ffmpeg.exe");
+  // 尝试 node_modules 中的路径
+  const cwdFallback = path.join(process.cwd(), "node_modules", "@ffmpeg-installer", "ffmpeg", "bin", "ffmpeg.exe");
   if (fs.existsSync(cwdFallback)) return cwdFallback;
+
+  // Linux 环境
+  const linuxFallback = path.join(process.cwd(), "node_modules", "@ffmpeg-installer", "ffmpeg", "bin", "ffmpeg");
+  if (fs.existsSync(linuxFallback)) return linuxFallback;
 
   return "ffmpeg";
 }
@@ -112,7 +118,7 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
           status: 0,
           format: "audio/L16;rate=16000",
           encoding: "raw",
-          audio: pcmBuffer.slice(0, 1280).toString("base64"), // 第一帧：1280字节
+          audio: Buffer.from(pcmBuffer.subarray(0, 1280)).toString("base64"), // 第一帧：1280字节
         },
       };
       ws.send(JSON.stringify(firstFrame));
@@ -121,7 +127,7 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
       const frameSize = 1280;
       let offset = 1280;
       while (offset < pcmBuffer.length) {
-        const chunk = pcmBuffer.slice(offset, offset + frameSize);
+        const chunk = Buffer.from(pcmBuffer.subarray(offset, offset + frameSize));
         const frame = {
           data: {
             status: 1,

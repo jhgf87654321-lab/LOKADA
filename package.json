@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@cloudbase/js-sdk": "^2.25.6",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-label": "^2.1.7",

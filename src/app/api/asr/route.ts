@@ -1,67 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs";
-import ffmpegPath from "@ffmpeg-installer/ffmpeg";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { toBlobURL } from "@ffmpeg/util";
 import WebSocket from "ws";
 
 const APPID = process.env.XF_APPID!;
 const API_KEY = process.env.XF_API_KEY!;
 const API_SECRET = process.env.XF_API_SECRET!;
 
-/** 解析 ffmpeg 可执行文件路径（兼容 Vercel Serverless 环境） */
-function getFfmpegBin(): string {
-  const envPath = process.env.FFMPEG_PATH;
-  if (envPath && fs.existsSync(envPath)) return envPath;
+let ffmpeg: FFmpeg | null = null;
 
-  // @ffmpeg-installer/ffmpeg 返回 { path, version, url }
-  const ffmpegInstaller = ffmpegPath as { path: string; version: string; url: string };
-  if (ffmpegInstaller?.path && fs.existsSync(ffmpegInstaller.path)) return ffmpegInstaller.path;
+/** 初始化 FFmpeg（WebAssembly 版本） */
+async function getFFmpeg(): Promise<FFmpeg> {
+  if (ffmpeg) return ffmpeg;
 
-  // 尝试 node_modules 中的路径
-  const cwdFallback = path.join(process.cwd(), "node_modules", "@ffmpeg-installer", "ffmpeg", "bin", "ffmpeg.exe");
-  if (fs.existsSync(cwdFallback)) return cwdFallback;
+  ffmpeg = new FFmpeg();
 
-  // Linux 环境
-  const linuxFallback = path.join(process.cwd(), "node_modules", "@ffmpeg-installer", "ffmpeg", "bin", "ffmpeg");
-  if (fs.existsSync(linuxFallback)) return linuxFallback;
+  // 加载 FFmpeg 核心文件（从 CDN 获取）
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
 
-  return "ffmpeg";
+  return ffmpeg;
 }
 
-function transcodeWebmToPcm16k(input: Buffer): Promise<Buffer> {
-  const bin = getFfmpegBin();
-  return new Promise((resolve, reject) => {
-    const ffmpeg = spawn(bin, [
-      "-i",
-      "pipe:0",
-      "-f",
-      "s16le",
-      "-acodec",
-      "pcm_s16le",
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "pipe:1",
-    ]);
+/** 使用 FFmpeg 将 webm/opus 转成 16k 单声道 PCM */
+async function transcodeWebmToPcm16k(webmBuffer: Buffer): Promise<Buffer> {
+  const ff = await getFFmpeg();
 
-    const chunks: Buffer[] = [];
+  // 写入输入文件
+  await ff.writeFile("input.webm", webmBuffer);
 
-    ffmpeg.stdout.on("data", (chunk) => chunks.push(chunk));
-    ffmpeg.stderr.on("data", (d) => {
-      // 可按需打开日志
-      // console.error("ffmpeg:", d.toString());
-    });
-    ffmpeg.on("error", (err) => reject(err));
-    ffmpeg.on("close", (code) => {
-      if (code === 0) resolve(Buffer.concat(chunks));
-      else reject(new Error(`ffmpeg exit code ${code}`));
-    });
+  // 转换为 16kHz PCM
+  await ff.exec([
+    "-i", "input.webm",
+    "-f", "s16le",
+    "-acodec", "pcm_s16le",
+    "-ac", "1",
+    "-ar", "16000",
+    "output.pcm"
+  ]);
 
-    ffmpeg.stdin.end(input);
-  });
+  // 读取输出文件
+  const outputBuffer = await ff.readFile("output.pcm");
+
+  // 清理临时文件
+  await ff.deleteFile("input.webm");
+  await ff.deleteFile("output.pcm");
+
+  return Buffer.from(outputBuffer);
 }
 
 /** 构建 WebSocket 鉴权 URL */
@@ -118,7 +107,7 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
           status: 0,
           format: "audio/L16;rate=16000",
           encoding: "raw",
-          audio: Buffer.from(pcmBuffer.subarray(0, 1280)).toString("base64"), // 第一帧：1280字节
+          audio: Buffer.from(pcmBuffer.subarray(0, 1280)).toString("base64"),
         },
       };
       ws.send(JSON.stringify(firstFrame));
@@ -152,7 +141,7 @@ function recognizeAudioViaWebSocket(pcmBuffer: Buffer): Promise<string> {
     ws.on("message", (data: WebSocket.Data) => {
       try {
         const json = JSON.parse(data.toString());
-        
+
         if (json.code !== 0) {
           hasError = true;
           console.error("iFlytek ASR error:", JSON.stringify(json, null, 2));
@@ -213,7 +202,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "empty audio" }, { status: 400 });
     }
 
-    // 使用 ffmpeg 将 webm/opus 转成 16k 单声道 PCM（raw）
+    // 使用 FFmpeg WebAssembly 将 webm/opus 转成 16k 单声道 PCM
     const pcmBuffer = await transcodeWebmToPcm16k(webmBuffer);
 
     // 通过 WebSocket 发送音频并获取识别结果

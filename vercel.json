@@ -12,7 +12,11 @@
     "NEXT_PUBLIC_CLOUDBASE_ENV": "denglu-8gher1d52a21e6fe",
     "NEXT_PUBLIC_CLOUDBASE_CLIENT_ID": "denglu-8gher1d52a21e6fe",
     "NEXT_PUBLIC_CLOUDBASE_REGION": "ap-shanghai",
-    "KIE_AI_API_KEY": "5936831ca8119955328b3672d5eb85f8",
-    "BLOB_READ_WRITE_TOKEN": "vercel_blob_rw_azUbBkYPoGPvfvFs_hqwYmUn1iylQkSafxIJP42qqKQtUTG"
+    "DASHSCOPE_API_KEY": "sk-你的阿里云DashScope API Key",
+    "BLOB_READ_WRITE_TOKEN": "vercel_blob_rw_azUbBkYPoGPvfvFs_hqwYmUn1iylQkSafxIJP42qqKQtUTG",
+    "COS_SECRET_ID": "你的COS SecretID",
+    "COS_SECRET_KEY": "你的COS SecretKey",
+    "COS_BUCKET": "你的COS Bucket名称",
+    "COS_REGION": "ap-shanghai"
   }
 }

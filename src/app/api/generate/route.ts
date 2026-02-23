@@ -66,6 +66,7 @@ export async function POST(_request: NextRequest) {
     });
 
     const kieData = await kieResponse.json();
+    console.log("Kie.ai API response:", kieResponse.status, kieData);
 
     if (!kieResponse.ok) {
       console.error("Kie.ai API error:", kieData);
@@ -76,6 +77,7 @@ export async function POST(_request: NextRequest) {
     }
 
     const taskId = kieData.data?.taskId as string | undefined;
+    console.log("Task ID extracted:", taskId);
 
     if (!taskId) {
       return NextResponse.json(

@@ -10,9 +10,10 @@ interface SidebarProps {
   selectedModelId: string;
   onModelSelect: (id: string) => void;
   onOpenGallery: () => void;
+  onImageSelect?: (image: ImageAsset) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ images, models, selectedModelId, onModelSelect, onOpenGallery }) => {
+const Sidebar: React.FC<SidebarProps> = ({ images, models, selectedModelId, onModelSelect, onOpenGallery, onImageSelect }) => {
   const [enlargedImage, setEnlargedImage] = useState<ImageAsset | null>(null);
 
   return (
@@ -33,11 +34,24 @@ const Sidebar: React.FC<SidebarProps> = ({ images, models, selectedModelId, onMo
               <div
                 key={img.id}
                 className="group relative aspect-square rounded-lg overflow-hidden border border-slate-100 cursor-pointer"
-                onClick={() => setEnlargedImage(img)}
+                onClick={() => onImageSelect ? onImageSelect(img) : setEnlargedImage(img)}
               >
                 <img src={img.url} alt={img.alt} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                   <MaterialIcon name="zoom_in" className="text-white" />
+                </div>
+                {/* 选择按钮 */}
+                <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    className="size-6 rounded bg-primary text-white flex items-center justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onImageSelect?.(img);
+                    }}
+                    title="使用此图片作为原图"
+                  >
+                    <MaterialIcon name="add" className="text-sm" />
+                  </button>
                 </div>
               </div>
             ))}

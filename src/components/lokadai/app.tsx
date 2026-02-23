@@ -351,6 +351,13 @@ const App: React.FC = () => {
           selectedModelId={selectedModel}
           onModelSelect={setSelectedModel}
           onOpenGallery={() => setView('gallery')}
+          onImageSelect={(img) => {
+            // 选择图片作为原图
+            setUploadedImageUrl(img.url);
+            setDesignState(prev => ({ ...prev, beforeUrl: img.url, afterUrl: img.url }));
+            setIsCurrentAdded(false);
+            setMessages(prev => [...prev, { role: Role.USER, text: `已选择图片: ${img.alt}` }]);
+          }}
         />
         <ChatArea
           messages={messages}

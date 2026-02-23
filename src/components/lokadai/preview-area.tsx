@@ -115,26 +115,38 @@ const PreviewArea: React.FC<PreviewAreaProps> = ({ designState, onAddToGallery, 
 
       <div className="flex-1 p-6 flex flex-col items-center justify-center relative">
         <div className="relative w-full aspect-[3/4] rounded-2xl bg-white shadow-2xl overflow-hidden border border-slate-200 group select-none">
-          {/* Main After Image (Base) */}
-          <img className="w-full h-full object-cover pointer-events-none" src={designState.afterUrl} alt="Updated Design" />
-
-          {/* Overlay Image (Before) */}
-          <div
-            className="absolute inset-y-0 left-0 overflow-hidden border-r-[3px] border-primary z-10 shadow-[4px_0_15px_rgba(0,0,0,0.3)]"
-            style={{ width: `${sliderValue}%` }}
-          >
-            <div className="absolute inset-0 w-[400px]">
-              <img
-                className="w-full h-full object-cover max-w-none grayscale opacity-70"
-                src={designState.beforeUrl}
-                alt="Before Design"
-                style={{ width: '400px', height: '100%' }}
-              />
+          {/* 如果没有图片，显示占位符 */}
+          {!designState.afterUrl && !designState.beforeUrl ? (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100">
+              <Icons.Image className="text-6xl text-slate-300 mb-4" />
+              <p className="text-sm text-slate-400">请先上传图片</p>
             </div>
-            <span className="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm whitespace-nowrap z-20">修改前</span>
-          </div>
+          ) : (
+            <>
+              {/* Main After Image (Base) */}
+              <img className="w-full h-full object-cover pointer-events-none" src={designState.afterUrl || designState.beforeUrl} alt="Updated Design" />
 
-          <span className="absolute top-4 right-4 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10 font-bold">修改后</span>
+              {/* Overlay Image (Before) - 只有当 beforeUrl 存在且与 afterUrl 不同时才显示 */}
+              {designState.beforeUrl && designState.beforeUrl !== designState.afterUrl && (
+                <div
+                  className="absolute inset-y-0 left-0 overflow-hidden border-r-[3px] border-primary z-10 shadow-[4px_0_15px_rgba(0,0,0,0.3)]"
+                  style={{ width: `${sliderValue}%` }}
+                >
+                  <div className="absolute inset-0 w-[400px]">
+                    <img
+                      className="w-full h-full object-cover max-w-none grayscale opacity-70"
+                      src={designState.beforeUrl}
+                      alt="Before Design"
+                      style={{ width: '400px', height: '100%' }}
+                    />
+                  </div>
+                  <span className="absolute top-4 left-4 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm whitespace-nowrap z-20">修改前</span>
+                </div>
+              )}
+
+              <span className="absolute top-4 right-4 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10 font-bold">修改后</span>
+            </>
+          )}
 
           {/* Invisible Range Slider for Interaction */}
           <input

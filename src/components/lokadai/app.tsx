@@ -10,15 +10,12 @@ import GalleryBackend from './gallery-backend';
 import MyCreations from './my-creations';
 import { getCloudbaseAuth } from '@/lib/cloudbase';
 
-const INITIAL_IMAGES: ImageAsset[] = [
-  { id: '1', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBdgJBcXeB3Zkito5LZSDl04gElAhWN-7GSdGwZryHkxZogwHjEC45zD3LqOpf61h9krLI_T2s4HlewL1feGuzvUMDXXD7lsr64bcOoLEGdnC_Dh9olqFbcaRnNq-bDxEoTURXypS_AtueJzibCBJ-ZImYDS8aGG5nBQ8uyxb3LZo99rmU0RKPa7PrpLRWlvspNAXW4vzN_-6fFRfxfkZUuKig4yKL-oN37fIHH3zRp-OvGYfS59Fayi_DAL2af41tNFdvrr6ZBUPNL', alt: '深蓝色夹克设计稿', timestamp: Date.now() - 1000000 },
-  { id: '2', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBDHeYw0Hsb6kHCHyzN4plCFqk5dIFaepOvXgklAnJmw0GywAQD2P8ayyS8zDfOcfivnXI7iKJDlh7STRjZGEU3CkpQDWEdpRZU3iVeA1jPNzBpeePoC_Qkh2Q1O3MXAICqaSpk15oyZre1QjFBYk_ihRbZmMYbh-BAUSqn0NCWBtEMDoZC9UclsClbA-yRRu3U2p50yjx7QaV0f8wkg2NcwYJIWLFRh-hiRlnW7FoAm3pg8-72mOLMyimXBzXiLQDYsYLjny8S8AAn', alt: '白色 T 恤基础样稿', timestamp: Date.now() - 5000000 },
-  { id: '3', url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDrLUQ-_JrrRZrW1CcG3VUZkBXgoM5tx4KPzw4SHmSMOvVOcWf5MV4G-hgyjDyvygRxnwBsv_1KwYZXM9OmNIrpwMuwdVEBtUdwS7AyS8dJkuVo88ZciYG6PwubCLS-Sem3TzEML3N3kkwFXjwfP9iLGU9ru_bUT-dfbPqISHvrGMxhGNBCQ1LKp6hu3GCGMiUMcdMqACAkowQqKCYWN2Xq1ru2CkggEEY1gHIrLPguc5UP03jWSIH6e6QauQozOT-cSRpKao0gqpiF', alt: '反光背心安全服', timestamp: Date.now() - 10000000 },
-];
+// 初始图片为空，用户需要先上传图片
+const INITIAL_IMAGES: ImageAsset[] = [];
 
 const INITIAL_DESIGN: DesignState = {
-  beforeUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCmT5LVObApJ4cJVtYS31_G5mLj6SIB-K5aX2EctPWVuIhnd25wDSEjx30RX3r6vzEvA-ri2xxtRB6pb32PeifZwg_9JJ_bHp1EzgN0cWkb_jNPxLz3EGuPHMKV7tnMj1Ph9yM4jtxgxUEEo7O71d97xbRN3WeJQDcaZYIOtO9JMumFo8PAEqpaewfGbZGPWLlrHtB3_2qbXClrRIZ95bjdduiPbTo3Bbd1r1kFKDI2Yyc8SXWcSAMbfT__Q56EFkpo2vtcYqwHvNbK',
-  afterUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCohsuoXIV52pYwuk7sDmuDAeSHVX87cIe5l_bmJbGiLiMLGc62MnXhusw-QnDZ5lteRbZE3Wr-z8qHCmoxUCLXGM-04i2hyvYX0Tsa1zwmS_JJ1EXrS7qiFhSUnAwpTtefZPZkssilq1FmomW5fda0bootzNOAZCERaulIev9EA2s_1lc15bWH3qknSpqeEAdVinV4XT1iYmrL6EZ--lx0r9czhEN7l5Hc1P4frML4UKT-jgS3dBx2KPyPJwcd7HPXN2f4xCIKHYWH',
+  beforeUrl: '',
+  afterUrl: '',
   material: '重磅帆布 / 防水涂层',
   colorScheme: '深灰色 (Pantone 19-3906)'
 };

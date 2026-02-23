@@ -18,7 +18,6 @@ function detectAudioFormat(buffer: Buffer): { format: string; sourceType: number
 
   const header = buffer.slice(0, 4).toString("hex").toUpperCase();
 
-  // 检测常见音频格式
   if (header.startsWith("52494646")) {
     return { format: "wav", sourceType: 1 };
   }
@@ -38,7 +37,6 @@ function detectAudioFormat(buffer: Buffer): { format: string; sourceType: number
     return { format: "m4a", sourceType: 1 };
   }
 
-  // WebM/Opus 格式检测
   const fullHeader = buffer.slice(0, 20).toString("hex").toUpperCase();
   if (fullHeader.startsWith("1A45DFA3")) {
     return { format: "ogg-opus", sourceType: 1 };
@@ -55,12 +53,20 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
 
   const { format, sourceType } = detectAudioFormat(audioBuffer);
 
+  // 创建客户端，添加完整的配置
   const client = new AsrClient({
     credential: {
       secretId: TENCENT_SECRET_ID,
       secretKey: TENCENT_SECRET_KEY,
     },
     region: TENCENT_ASR_REGION,
+    profile: {
+      httpProfile: {
+        endpoint: "asr.tencentcloudapi.com",
+        reqMethod: "POST",
+        reqTimeout: 60,
+      },
+    },
   });
 
   const base64Data = audioBuffer.toString("base64");
@@ -70,7 +76,7 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
     EngSerViceType: "16k_zh",
     SourceType: sourceType,
     VoiceFormat: format,
-    UsrAudioKey: `audio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    UsrAudioKey: `audio_${Date.now()}`,
   };
 
   try {
@@ -83,7 +89,6 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
   } catch (err: unknown) {
     console.error("ASR SDK error:", err);
 
-    // 提取错误代码和请求ID
     let errorCode = "UNKNOWN";
     let requestId = "";
     if (err && typeof err === "object") {

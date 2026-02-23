@@ -5,9 +5,9 @@ import { put, del } from "@vercel/blob";
 
 export const runtime = "nodejs";
 
-const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID;
-const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY;
-const TENCENT_APP_ID = process.env.TENCENT_APP_ID;
+const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || process.env.COS_SECRET_ID;
+const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || process.env.COS_SECRET_KEY;
+const TENCENT_APP_ID = process.env.TENCENT_APP_ID || process.env.COS_SECRET_ID?.replace(/^\d+-/, "");
 const COS_SECRET_ID = process.env.COS_SECRET_ID;
 const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
 const COS_BUCKET = process.env.COS_BUCKET;
@@ -242,7 +242,7 @@ async function uploadToCos(buffer: Buffer): Promise<string | null> {
     Key: key,
     Sign: true,
     Expires: 604800,
-    protocol: "https:",
+    Protocol: "https:",
   });
 
   return signedUrl;

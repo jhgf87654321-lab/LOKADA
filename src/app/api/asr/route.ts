@@ -18,6 +18,8 @@ function generateTC3Authorization(secretId: string, secretKey: string, method: s
   const timestamp = Math.floor(Date.now() / 1000);
   const date = new Date(timestamp * 1000).toISOString().split("T")[0].replace(/-/g, "");
 
+  console.log("签名参数:", { secretId: secretId?.slice(0, 10), timestamp, date });
+
   // 1. 规范请求串
   const canonicalUri = pathname || "/";
   const canonicalQueryString = Object.keys(query).sort().map(k => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`).join("&");
@@ -54,7 +56,10 @@ function generateTC3Authorization(secretId: string, secretKey: string, method: s
   const signature = crypto.createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
 
   // 4. 拼接 Authorization
-  return `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  const auth = `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  console.log("生成的 Authorization:", auth.slice(0, 100) + "...");
+
+  return auth;
 }
 
 /** 腾讯云录音文件识别 - 使用 HTTP API */

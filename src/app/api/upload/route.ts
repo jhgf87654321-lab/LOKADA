@@ -75,9 +75,6 @@ export async function POST(request: NextRequest) {
     const extension = nameExt || mimeExt || "png";
     const filename = `upload-${timestamp}-${randomId}.${extension}`;
 
-    const Bucket = process.env.COS_BUCKET;
-    const Region = process.env.COS_REGION || 'ap-shanghai';
-
     if (!Bucket || !Region) {
       return NextResponse.json(
         { error: 'COS 存储未配置，请设置 COS_BUCKET 和 COS_REGION 环境变量' },

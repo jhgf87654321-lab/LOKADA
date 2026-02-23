@@ -10,6 +10,57 @@ const TENCENT_ASR_REGION = process.env.TENCENT_ASR_REGION || "ap-guangzhou";
 // 腾讯云 ASR 客户端类
 const AsrClient = tencentcloud.asr.v20190614.Client;
 
+// 时间同步相关
+let timeOffset = 0;
+let lastSyncTime = 0;
+const TIME_SYNC_INTERVAL = 60 * 60 * 1000; // 1小时同步一次
+
+/** 获取当前时间戳（考虑时间偏移） */
+function getCurrentTimestamp(): number {
+  return Math.floor(Date.now() / 1000) + timeOffset;
+}
+
+/** 同步时间 */
+async function syncTime(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSyncTime < TIME_SYNC_INTERVAL) {
+    return; // 1小时内已同步过
+  }
+
+  try {
+    // 使用多个 NTP 服务器进行时间同步
+    const ntpServers = [
+      'time.apple.com',
+      'time.google.com',
+      'pool.ntp.org',
+    ];
+
+    for (const server of ntpServers) {
+      try {
+        const start = Date.now();
+        // 使用 HTTP 请求获取服务器时间作为参考
+        const response = await fetch(`https://${server}`, {
+          method: 'HEAD',
+          cache: 'no-store',
+        });
+        const serverDate = response.headers.get('date');
+
+        if (serverDate) {
+          const remoteTime = new Date(serverDate).getTime();
+          timeOffset = remoteTime - now;
+          lastSyncTime = now;
+          console.log(`Time synced with ${server}, offset: ${timeOffset}ms`);
+          return;
+        }
+      } catch (e) {
+        console.log(`Failed to sync time with ${server}:`, e);
+      }
+    }
+  } catch (e) {
+    console.error('Time sync failed:', e);
+  }
+}
+
 /** 从文件头检测音频格式 */
 function detectAudioFormat(buffer: Buffer): { format: string; sourceType: number } {
   if (buffer.length < 4) {
@@ -51,9 +102,11 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
     throw new Error("ASR not configured");
   }
 
+  // 同步时间
+  await syncTime();
+
   const { format, sourceType } = detectAudioFormat(audioBuffer);
 
-  // 创建客户端，添加完整的配置
   const client = new AsrClient({
     credential: {
       secretId: TENCENT_SECRET_ID,
@@ -95,6 +148,12 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
       const errObj = err as Record<string, unknown>;
       if (errObj.code) errorCode = String(errObj.code);
       if (errObj.requestId) requestId = String(errObj.requestId);
+
+      // 如果是签名错误，尝试重新同步时间
+      if (errorCode.includes("AuthFailure") || errorCode.includes("Signature")) {
+        console.log("Signature error detected, forcing time sync...");
+        lastSyncTime = 0; // 强制下次重新同步
+      }
     }
 
     const errorMessage = err instanceof Error ? err.message : "Unknown error";

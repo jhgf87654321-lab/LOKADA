@@ -134,7 +134,7 @@ const PreviewArea: React.FC<PreviewAreaProps> = ({ designState, onAddToGallery, 
                 >
                   <div className="absolute inset-0 w-[400px]">
                     <img
-                      className="w-full h-full object-cover max-w-none grayscale opacity-70"
+                      className="w-full h-full object-cover max-w-none"
                       src={designState.beforeUrl}
                       alt="Before Design"
                       style={{ width: '400px', height: '100%' }}

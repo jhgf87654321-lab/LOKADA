@@ -4,23 +4,10 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "env": {
-    "BETTER_AUTH_SECRET": "CaYKBEkHXr644oHKTKq7POcwnwOSftb2",
-    "BETTER_AUTH_BASE_URL": "https://lokada.vercel.app",
-    "DATABASE_URL": "postgresql://<username>:<password>@<cloudbase-postgres-host>:5432/<database>",
-    "DIRECT_URL": "postgresql://<username>:<password>@<cloudbase-postgres-host>:5432/<database>",
     "NEXT_PUBLIC_BASE_URL": "https://lokada.vercel.app",
     "NEXT_PUBLIC_CLOUDBASE_ENV": "denglu-8gher1d52a21e6fe",
     "NEXT_PUBLIC_CLOUDBASE_CLIENT_ID": "denglu-8gher1d52a21e6fe",
     "NEXT_PUBLIC_CLOUDBASE_REGION": "ap-shanghai",
-    "DASHSCOPE_API_KEY": "",
-    "TENCENT_SECRET_ID": "",
-    "TENCENT_SECRET_KEY": "",
-    "TENCENT_APP_ID": "",
-    "KIE_AI_API_KEY": "",
-    "BLOB_READ_WRITE_TOKEN": "vercel_blob_rw_azUbBkYPoGPvfvFs_hqwYmUn1iylQkSafxIJP42qqKQtUTG",
-    "COS_SECRET_ID": "",
-    "COS_SECRET_KEY": "",
-    "COS_BUCKET": "",
     "COS_REGION": "ap-shanghai"
   }
 }

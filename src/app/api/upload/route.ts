@@ -24,6 +24,17 @@ function putObject(params: any): Promise<any> {
 
 export async function POST(request: NextRequest) {
   try {
+    // 在请求处理时读取环境变量
+    const COS_SECRET_ID = process.env.COS_SECRET_ID;
+    const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
+    const Bucket = process.env.COS_BUCKET;
+    const Region = process.env.COS_REGION || 'ap-shanghai';
+
+    // 运行时调试日志
+    console.log("RUNTIME - COS_SECRET_ID:", COS_SECRET_ID ? "已配置" : "未配置");
+    console.log("RUNTIME - Bucket:", Bucket);
+    console.log("RUNTIME - Region:", Region);
+
     const contentTypeHeader = request.headers.get("content-type") || "";
     const filenameHeader = request.headers.get("x-file-name") || "upload";
 

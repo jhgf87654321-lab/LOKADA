@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 
 const KIE_AI_API_URL = "https://api.kie.ai/api/v1/jobs/createTask";
-const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY!;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 // 调试日志
-console.log("DEBUG - KIE_AI_API_KEY:", KIE_AI_API_KEY ? `已配置(${KIE_AI_API_KEY.substring(0, 8)}...)` : "未配置");
-console.log("DEBUG - startsWith '你的':", KIE_AI_API_KEY?.startsWith("你的"));
-console.log("DEBUG - includes 'API Key':", KIE_AI_API_KEY?.includes("API Key"));
+console.log("DEBUG - KIE_AI_API_KEY:", process.env.KIE_AI_API_KEY ? `已配置(${process.env.KIE_AI_API_KEY.substring(0, 8)}...)` : "未配置");
 
 export async function POST(_request: NextRequest) {
   try {
+    // 在请求处理时重新读取环境变量，避免模块缓存问题
+    const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY;
+
     const headersList = await headers();
     console.log("API Headers:", headersList.get("cookie"));
     const body = await _request.json();
@@ -36,9 +36,9 @@ export async function POST(_request: NextRequest) {
     const imageInput = originalImageUrl ? [originalImageUrl] : [];
 
     // Call Kie.ai API to create task
-    if (!KIE_AI_API_KEY || KIE_AI_API_KEY.startsWith("你的") || KIE_AI_API_KEY.includes("API Key")) {
+    if (!KIE_AI_API_KEY) {
       return NextResponse.json(
-        { error: "KIE_AI_API_KEY 未配置或为占位符，请设置真实的 API Key" },
+        { error: "KIE_AI_API_KEY 未配置，请设置环境变量" },
         { status: 500 }
       );
     }

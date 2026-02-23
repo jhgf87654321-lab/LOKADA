@@ -168,6 +168,13 @@ async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
+    // 在请求处理时读取环境变量
+    const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID;
+    const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY;
+
+    console.log("RUNTIME - TENCENT_SECRET_ID:", TENCENT_SECRET_ID ? "已配置" : "未配置");
+    console.log("RUNTIME - TENCENT_SECRET_KEY:", TENCENT_SECRET_KEY ? "已配置" : "未配置");
+
     if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY) {
       return NextResponse.json({ error: "ASR not configured" }, { status: 500 });
     }

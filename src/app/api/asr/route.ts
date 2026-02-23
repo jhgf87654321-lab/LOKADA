@@ -18,13 +18,23 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
     throw new Error("腾讯云 ASR 未配置");
   }
 
-  // 动态导入，避免构建时问题
+  // 动态导入腾讯云 SDK
   const tencentcloud = await import("tencentcloud-sdk-nodejs");
   const AsrClient = tencentcloud.asr.v20190614.Client;
   const Credential = tencentcloud.common.Credential;
 
   const cred = new Credential(TENCENT_SECRET_ID, TENCENT_SECRET_KEY);
   const client = new AsrClient(cred, "ap-shanghai");
+
+  // 为 SDK 设置 fetch（Node.js 18+ 需要）
+  // @ts-ignore
+  if (typeof globalThis.fetch === "undefined") {
+    const { default: fetch } = await import("node-fetch");
+    // @ts-ignore
+    globalThis.fetch = fetch;
+    // @ts-ignore
+    globalThis.Response = fetch.Response;
+  }
 
   // 使用回调包装为 Promise
   const createTask = (params: any) => new Promise((resolve, reject) => {

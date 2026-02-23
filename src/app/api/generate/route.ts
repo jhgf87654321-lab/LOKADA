@@ -12,6 +12,9 @@ export async function POST(_request: NextRequest) {
     // 在请求处理时重新读取环境变量，避免模块缓存问题
     const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY;
 
+    // 运行时调试日志
+    console.log("RUNTIME - KIE_AI_API_KEY:", KIE_AI_API_KEY, "| type:", typeof KIE_AI_API_KEY);
+
     const headersList = await headers();
     console.log("API Headers:", headersList.get("cookie"));
     const body = await _request.json();

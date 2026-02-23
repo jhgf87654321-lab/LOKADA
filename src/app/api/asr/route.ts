@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
     const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID;
     const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY;
 
-    console.log("RUNTIME - TENCENT_SECRET_ID:", TENCENT_SECRET_ID ? "已配置" : "未配置");
+    console.log("RUNTIME - TENCENT_SECRET_ID:", TENCENT_SECRET_ID, "| type:", typeof TENCENT_SECRET_ID);
     console.log("RUNTIME - TENCENT_SECRET_KEY:", TENCENT_SECRET_KEY ? "已配置" : "未配置");
 
     if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY) {

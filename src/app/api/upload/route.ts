@@ -30,10 +30,11 @@ export async function POST(request: NextRequest) {
     const Bucket = process.env.COS_BUCKET;
     const Region = process.env.COS_REGION || 'ap-shanghai';
 
-    // 运行时调试日志
-    console.log("RUNTIME - COS_SECRET_ID:", COS_SECRET_ID ? "已配置" : "未配置");
-    console.log("RUNTIME - Bucket:", Bucket);
-    console.log("RUNTIME - Region:", Region);
+    // 运行时调试日志 - 输出实际值而不是简化的消息
+    console.log("RUNTIME - COS_SECRET_ID:", COS_SECRET_ID);
+    console.log("RUNTIME - COS_SECRET_KEY:", COS_SECRET_KEY ? "已配置" : "未配置");
+    console.log("RUNTIME - Bucket:", Bucket, "| type:", typeof Bucket);
+    console.log("RUNTIME - Region:", Region, "| type:", typeof Region);
 
     const contentTypeHeader = request.headers.get("content-type") || "";
     const filenameHeader = request.headers.get("x-file-name") || "upload";

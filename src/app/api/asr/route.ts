@@ -13,18 +13,54 @@ const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
 const COS_BUCKET = process.env.COS_BUCKET;
 const COS_REGION = process.env.COS_REGION || "ap-shanghai";
 
-/** 生成腾讯云签名 - 使用 API Key 方式 */
-function generateSignature(secretId: string, secretKey: string, payload: string) {
+/** 生成腾讯云 TC3 签名 - 正确的日期格式 */
+function generateTC3Authorization(secretId: string, secretKey: string, method: string, pathname: string, query: Record<string, string>, payload: string) {
   const timestamp = Math.floor(Date.now() / 1000);
+  // 关键：日期格式必须是 YYYY-MM-DD（带连字符）
+  const date = new Date(timestamp * 1000).toISOString().split("T")[0];
 
-  // 使用 HmacSHA1 签名方式（更简单）
-  const signatureOrigin = `POSTasr.tencentcloudapi.com/\n${payload}`;
-  const signature = crypto.createHmac("sha1", secretKey).update(signatureOrigin).digest("base64");
+  console.log("签名参数:", { secretId: secretId?.slice(0, 10), timestamp, date });
 
-  return {
+  // 1. 规范请求串
+  const canonicalUri = pathname || "/";
+  const canonicalQueryString = Object.keys(query).sort().map(k => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`).join("&");
+  const hashedPayload = crypto.createHash("sha256").update(payload).digest("hex");
+
+  const canonicalHeaders = `content-type:application/json\nhost:asr.tencentcloudapi.com\n`;
+  const signedHeaders = "content-type;host";
+
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    hashedPayload
+  ].join("\n");
+
+  // 2. 拼接待签名字符串
+  const algorithm = "TC3-HMAC-SHA256";
+  const credentialScope = `${date}/asr/tc3_request`;
+  const hashedCanonicalRequest = crypto.createHash("sha256").update(canonicalRequest).digest("hex");
+
+  const stringToSign = [
+    algorithm,
     timestamp,
-    signature,
-  };
+    credentialScope,
+    hashedCanonicalRequest
+  ].join("\n");
+
+  // 3. 计算签名
+  const secretDate = crypto.createHmac("sha256", "TC3" + secretKey).update(date).digest();
+  const secretService = crypto.createHmac("sha256", secretDate).update("asr").digest();
+  const secretSigning = crypto.createHmac("sha256", secretService).update("tc3_request").digest();
+  const signature = crypto.createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
+
+  // 4. 拼接 Authorization
+  const auth = `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  console.log("Authorization:", auth.slice(0, 80) + "...");
+
+  return auth;
 }
 
 /** 腾讯云录音文件识别 - 使用 HTTP API */
@@ -34,29 +70,26 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   }
 
   const endpoint = "asr.tencentcloudapi.com";
+  const timestamp = Math.floor(Date.now() / 1000);
+  const date = new Date(timestamp * 1000).toISOString().split("T")[0];
 
   // 创建识别任务
   const payload = JSON.stringify({
     EngineType: "16k_zh",
     Url: fileUrl,
-    ProjectId: 0,
-    SubServiceType: 2,
-    EngSerViceType: "8k",
-    SourceType: 0,
-    VoiceFormat: "wav",
-    Msecs: 30000,
-    SessionId: `session_${Date.now()}`,
   });
 
-  const { timestamp, signature } = generateSignature(TENCENT_SECRET_ID, TENCENT_SECRET_KEY, payload);
-
   console.log("创建腾讯云 ASR 任务...");
-  console.log("SecretId:", TENCENT_SECRET_ID?.slice(0, 10));
-  console.log("Timestamp:", timestamp);
-  console.log("Payload:", payload);
+  console.log("日期:", date);
 
-  const auth = `TC3-HMAC-SHA256 Credential=${TENCENT_SECRET_ID}/, SignedHeaders=content-type;host, Signature=${signature}`;
-  console.log("Auth:", auth.slice(0, 80));
+  const auth = generateTC3Authorization(
+    TENCENT_SECRET_ID,
+    TENCENT_SECRET_KEY,
+    "POST",
+    "/",
+    {},
+    payload
+  );
 
   const response = await fetch(`https://${endpoint}/`, {
     method: "POST",
@@ -91,10 +124,19 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
       TaskId: taskId,
     });
 
+    const statusAuth = generateTC3Authorization(
+      TENCENT_SECRET_ID,
+      TENCENT_SECRET_KEY,
+      "POST",
+      "/",
+      {},
+      statusPayload
+    );
+
     const statusResponse = await fetch(`https://${endpoint}/`, {
       method: "POST",
       headers: {
-        Authorization: auth,
+        Authorization: statusAuth,
         "Content-Type": "application/json",
         Host: endpoint,
         "X-TC-Action": "GetTaskStatus",

@@ -18,13 +18,28 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
     throw new Error("腾讯云 ASR 未配置");
   }
 
-  // 使用正确的 SDK 导入方式
-  const tencentcloud = require("tencentcloud-sdk-nodejs");
+  // 动态导入，避免构建时问题
+  const tencentcloud = await import("tencentcloud-sdk-nodejs");
   const AsrClient = tencentcloud.asr.v20190614.Client;
   const Credential = tencentcloud.common.Credential;
 
   const cred = new Credential(TENCENT_SECRET_ID, TENCENT_SECRET_KEY);
   const client = new AsrClient(cred, "ap-shanghai");
+
+  // 使用回调包装为 Promise
+  const createTask = (params: any) => new Promise((resolve, reject) => {
+    client.CreateRecTask(params, (err: any, response: any) => {
+      if (err) reject(err);
+      else resolve(response);
+    });
+  });
+
+  const getTaskStatus = (params: any) => new Promise((resolve, reject) => {
+    client.DescribeTaskStatus(params, (err: any, response: any) => {
+      if (err) reject(err);
+      else resolve(response);
+    });
+  });
 
   // 创建识别任务
   const createParams = {
@@ -34,20 +49,14 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
 
   console.log("创建腾讯云 ASR 任务...");
 
-  const createResult = await new Promise((resolve, reject) => {
-    client.CreateRecTask(createParams, (err: any, response: any) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-
+  const createResult = await createTask(createParams) as any;
   console.log("ASR 任务创建结果:", createResult);
 
-  if ((createResult as any).Error) {
-    throw new Error(`腾讯云 ASR 错误: ${(createResult as any).Error.Message}`);
+  if (createResult.Error) {
+    throw new Error(`腾讯云 ASR 错误: ${createResult.Error.Message}`);
   }
 
-  const taskId = (createResult as any).TaskId;
+  const taskId = createResult.TaskId;
   if (!taskId) {
     throw new Error("腾讯云 ASR 未返回 TaskId");
   }
@@ -56,18 +65,12 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 2000));
 
-    const statusResult = await new Promise((resolve, reject) => {
-      client.DescribeTaskStatus({ TaskId: taskId }, (err: any, response: any) => {
-        if (err) reject(err);
-        else resolve(response);
-      });
-    });
-
+    const statusResult = await getTaskStatus({ TaskId: taskId }) as any;
     console.log(`轮询任务状态 (${i + 1}/30):`, statusResult);
 
-    const status = (statusResult as any).Status;
+    const status = statusResult.Status;
     if (status === 1) {
-      const resultText = (statusResult as any).Result;
+      const resultText = statusResult.Result;
       if (resultText) {
         try {
           const parsed = JSON.parse(resultText);
@@ -80,7 +83,7 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
       return "";
     }
     if (status === 2) {
-      throw new Error(`腾讯云 ASR 任务失败: ${(statusResult as any).ErrorMessage}`);
+      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.ErrorMessage}`);
     }
   }
 

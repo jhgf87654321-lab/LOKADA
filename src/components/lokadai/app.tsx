@@ -10,12 +10,16 @@ import GalleryBackend from './gallery-backend';
 import MyCreations from './my-creations';
 import { getCloudbaseAuth } from '@/lib/cloudbase';
 
-// 初始图片为空，用户需要先上传图片
-const INITIAL_IMAGES: ImageAsset[] = [];
+// 预设图片 - 使用腾讯云 COS URL（国内可访问）
+const INITIAL_IMAGES: ImageAsset[] = [
+  { id: '1', url: 'https://lokada-1254090729.cos.ap-shanghai.myqcloud.com/预设图/蓝色夹克.png', alt: '深蓝色夹克设计稿', timestamp: Date.now() - 1000000 },
+  { id: '2', url: 'https://lokada-1254090729.cos.ap-shanghai.myqcloud.com/预设图/白色T恤.png', alt: '白色 T 恤基础样稿', timestamp: Date.now() - 5000000 },
+  { id: '3', url: 'https://lokada-1254090729.cos.ap-shanghai.myqcloud.com/预设图/反光背心.png', alt: '反光背心安全服', timestamp: Date.now() - 10000000 },
+];
 
 const INITIAL_DESIGN: DesignState = {
-  beforeUrl: '',
-  afterUrl: '',
+  beforeUrl: 'https://lokada-1254090729.cos.ap-shanghai.myqcloud.com/预设图/蓝色夹克.png',
+  afterUrl: 'https://lokada-1254090729.cos.ap-shanghai.myqcloud.com/预设图/蓝色夹克.png',
   material: '重磅帆布 / 防水涂层',
   colorScheme: '深灰色 (Pantone 19-3906)'
 };

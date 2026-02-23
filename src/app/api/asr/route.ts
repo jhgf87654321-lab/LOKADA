@@ -15,8 +15,16 @@ const COS_REGION = process.env.COS_REGION || "ap-shanghai";
 /** 懒加载腾讯云 SDK */
 function getAsrClient() {
   const tencentcloud = require("tencentcloud");
-  const AsrClient = tencentcloud.asr.v20190614.Client;
-  return AsrClient;
+  console.log("TencentCloud SDK 模块:", Object.keys(tencentcloud));
+
+  // 尝试不同的导入方式
+  const asrModule = tencentcloud.asr;
+  console.log("ASR 模块:", asrModule ? Object.keys(asrModule) : "undefined");
+
+  if (!asrModule?.v20190614?.Client) {
+    throw new Error("无法加载腾讯云 ASR SDK，请检查 SDK 版本");
+  }
+  return asrModule.v20190614.Client;
 }
 
 /** 腾讯云录音文件识别 */

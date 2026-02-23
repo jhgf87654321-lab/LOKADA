@@ -69,6 +69,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 验证 Bucket 格式（应该是 name-appid 格式，如 lokada-1254090729）
+    if (!/^[a-z0-9]+-\d+$/.test(Bucket)) {
+      return NextResponse.json(
+        { error: `COS_BUCKET 格式错误，应为 "名称-AppId" 格式，如 lokada-1254090729，当前值: ${Bucket}` },
+        { status: 500 }
+      );
+    }
+
     const key = `uploads/${filename}`;
 
     const params: any = {

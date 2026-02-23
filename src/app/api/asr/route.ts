@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import COS from "cos-nodejs-sdk-v5";
 import { put } from "@vercel/blob";
-import tencentcloud from "tencentcloud";
 
 export const runtime = "nodejs";
-
-// 使用腾讯云 SDK 简化 API 调用
-const AsrClient = tencentcloud.asr.v20190614.Client;
 
 const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID || process.env.COS_SECRET_ID;
 const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY || process.env.COS_SECRET_KEY;
@@ -16,11 +12,20 @@ const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
 const COS_BUCKET = process.env.COS_BUCKET;
 const COS_REGION = process.env.COS_REGION || "ap-shanghai";
 
+/** 懒加载腾讯云 SDK */
+function getAsrClient() {
+  const tencentcloud = require("tencentcloud");
+  const AsrClient = tencentcloud.asr.v20190614.Client;
+  return AsrClient;
+}
+
 /** 腾讯云录音文件识别 */
 async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
     throw new Error("腾讯云 ASR 未配置：请设置 TENCENT_SECRET_ID、TENCENT_SECRET_KEY、TENCENT_APP_ID");
   }
+
+  const AsrClient = getAsrClient();
 
   const clientConfig = {
     credential: {
@@ -41,56 +46,49 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   const createParams = {
     EngineType: "16k_zh",
     Url: fileUrl,
-    CallbackUrl: "", // 不使用回调，轮询结果
   };
 
-  console.log("创建腾讯云 ASR 任务...", createParams);
+  console.log("创建腾讯云 ASR 任务...");
 
-  try {
-    const createResult = await client.CreateRecTask(createParams);
-    console.log("ASR 任务创建结果:", createResult);
+  const createResult = await client.CreateRecTask(createParams);
+  console.log("ASR 任务创建结果:", createResult);
 
-    if (createResult.Error) {
-      throw new Error(`腾讯云 ASR 错误: ${createResult.Error.Message}`);
-    }
-
-    const taskId = createResult.TaskId;
-    if (!taskId) {
-      throw new Error("腾讯云 ASR 未返回 TaskId");
-    }
-
-    // 轮询任务状态
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-
-      const statusResult = await client.DescribeTaskStatus({ TaskId: taskId });
-      console.log(`轮询任务状态 (${i + 1}/30):`, statusResult);
-
-      const status = statusResult.Status;
-      // Status: 0=等待中, 1=成功, 2=失败, 3=进行中
-      if (status === 1) {
-        const resultText = statusResult.Result;
-        if (resultText) {
-          try {
-            const parsed = JSON.parse(resultText);
-            const sentences = parsed?.sentence_info?.map((s: { text: string }) => s.text).join("") || "";
-            return sentences;
-          } catch {
-            return resultText;
-          }
-        }
-        return "";
-      }
-      if (status === 2) {
-        throw new Error(`腾讯云 ASR 任务失败: ${statusResult.ErrorMessage}`);
-      }
-    }
-
-    throw new Error("腾讯云 ASR 任务超时");
-  } catch (error) {
-    console.error("腾讯云 ASR 错误:", error);
-    throw error;
+  if (createResult.Error) {
+    throw new Error(`腾讯云 ASR 错误: ${createResult.Error.Message}`);
   }
+
+  const taskId = createResult.TaskId;
+  if (!taskId) {
+    throw new Error("腾讯云 ASR 未返回 TaskId");
+  }
+
+  // 轮询任务状态
+  for (let i = 0; i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const statusResult = await client.DescribeTaskStatus({ TaskId: taskId });
+    console.log(`轮询任务状态 (${i + 1}/30):`, statusResult);
+
+    const status = statusResult.Status;
+    if (status === 1) {
+      const resultText = statusResult.Result;
+      if (resultText) {
+        try {
+          const parsed = JSON.parse(resultText);
+          const sentences = parsed?.sentence_info?.map((s: { text: string }) => s.text).join("") || "";
+          return sentences;
+        } catch {
+          return resultText;
+        }
+      }
+      return "";
+    }
+    if (status === 2) {
+      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.ErrorMessage}`);
+    }
+  }
+
+  throw new Error("腾讯云 ASR 任务超时");
 }
 
 async function uploadToCos(buffer: Buffer): Promise<string | null> {

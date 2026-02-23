@@ -46,7 +46,9 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    const kieResponse = await fetch(KIE_AI_API_URL, {
+    let kieResponse;
+    try {
+      kieResponse = await fetch(KIE_AI_API_URL, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${KIE_AI_API_KEY}`,
@@ -64,6 +66,14 @@ export async function POST(_request: NextRequest) {
         callBackUrl: `${NEXT_PUBLIC_BASE_URL}/api/callback`,
       }),
     });
+    } catch (fetchError: unknown) {
+      console.error("Fetch error:", fetchError);
+      const errMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      return NextResponse.json(
+        { error: "API request failed", details: errMsg },
+        { status: 500 }
+      );
+    }
 
     const kieData = await kieResponse.json();
     console.log("Kie.ai API response:", kieResponse.status, kieData);

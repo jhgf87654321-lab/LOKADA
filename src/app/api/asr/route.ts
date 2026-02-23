@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import COS from "cos-nodejs-sdk-v5";
-import { put, del } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import tencentcloud from "tencentcloud";
 
 export const runtime = "nodejs";
@@ -128,45 +128,37 @@ async function uploadToCos(buffer: Buffer): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("ASR 配置:", {
-      TENCENT_SECRET_ID: TENCENT_SECRET_ID?.slice(0, 10) + "...",
-      TENCENT_SECRET_KEY: TENCENT_SECRET_KEY ? "已设置" : "未设置",
-      TENCENT_APP_ID,
-      COS_BUCKET,
-    });
+    console.log("ASR 请求 received");
 
     if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
       return NextResponse.json(
-        { error: "腾讯云 ASR 未配置：请在 Vercel 环境变量中设置 TENCENT_SECRET_ID、TENCENT_SECRET_KEY、TENCENT_APP_ID" },
+        { error: "腾讯云 ASR 未配置" },
         { status: 500 }
       );
     }
 
     const raw = Buffer.from(await req.arrayBuffer());
+    console.log("收到音频数据:", raw.length, "bytes");
+
     if (!raw.length) {
       return NextResponse.json({ error: "empty audio" }, { status: 400 });
     }
 
     // 优先上传到 COS
     const cosUrl = await uploadToCos(raw);
-    if (cosUrl) {
-      console.log("COS URL:", cosUrl);
-      const text = await recognizeWithTencentASR(cosUrl);
-      return NextResponse.json({ text });
-    }
-
-    // 回退到 Vercel Blob
-    const blob = await put(`asr-${Date.now()}-${Math.random().toString(36).slice(2)}.webm`, raw, {
-      access: "public",
-      contentType: "audio/webm",
-    });
-
-    try {
+    if (!cosUrl) {
+      // 回退到 Vercel Blob
+      const blob = await put(`asr-${Date.now()}.webm`, raw, {
+        access: "public",
+        contentType: "audio/webm",
+      });
       const text = await recognizeWithTencentASR(blob.url);
       return NextResponse.json({ text });
-    } finally {
-      await del(blob.url).catch(() => {});
     }
+
+    console.log("COS URL:", cosUrl);
+    const text = await recognizeWithTencentASR(cosUrl);
+    return NextResponse.json({ text });
   } catch (e: unknown) {
     console.error("ASR error:", e);
     const message = e instanceof Error ? e.message : "error";

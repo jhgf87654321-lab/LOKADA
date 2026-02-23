@@ -6,7 +6,9 @@ const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY!;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 // 调试日志
-console.log("DEBUG - KIE_AI_API_KEY:", KIE_AI_API_KEY ? "已配置" : "未配置");
+console.log("DEBUG - KIE_AI_API_KEY:", KIE_AI_API_KEY ? `已配置(${KIE_AI_API_KEY.substring(0, 8)}...)` : "未配置");
+console.log("DEBUG - startsWith '你的':", KIE_AI_API_KEY?.startsWith("你的"));
+console.log("DEBUG - includes 'API Key':", KIE_AI_API_KEY?.includes("API Key"));
 
 export async function POST(_request: NextRequest) {
   try {

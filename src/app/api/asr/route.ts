@@ -8,8 +8,9 @@ const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY;
 const TENCENT_ASR_REGION = process.env.TENCENT_ASR_REGION || "ap-guangzhou";
 
 // 调试日志
-console.log("DEBUG - TENCENT_SECRET_ID:", TENCENT_SECRET_ID ? "已配置" : "未配置");
-console.log("DEBUG - TENCENT_SECRET_KEY:", TENCENT_SECRET_KEY ? "已配置" : "未配置");
+console.log("DEBUG - TENCENT_SECRET_ID:", TENCENT_SECRET_ID ? `已配置(${TENCENT_SECRET_ID.substring(0, 8)}...)` : "未配置");
+console.log("DEBUG - TENCENT_SECRET_KEY:", TENCENT_SECRET_KEY ? `已配置(${TENCENT_SECRET_KEY.substring(0, 8)}...)` : "未配置");
+console.log("DEBUG - TENCENT_ASR_REGION:", TENCENT_ASR_REGION);
 
 // 腾讯云 ASR 客户端类
 const AsrClient = tencentcloud.asr.v20190614.Client;

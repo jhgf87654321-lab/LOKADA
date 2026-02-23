@@ -4,6 +4,7 @@ declare module "tencentcloud" {
       Client: new (config: any) => {
         CreateRecTask(params: any): Promise<any>;
         DescribeTaskStatus(params: any): Promise<any>;
+        SentenceRecognition(params: any): Promise<any>;
       };
     };
   };

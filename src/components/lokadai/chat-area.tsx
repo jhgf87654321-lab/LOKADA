@@ -63,30 +63,33 @@ const ChatArea: React.FC<ChatAreaProps> = ({ messages, onSendMessage, isGenerati
         setVoiceStatus('processing');
         setInterimTranscript('正在识别...');
 
+        // 保存 stream 引用以便清理
+        const audioStream = stream;
+
         try {
-          // 直接上传 webm，由服务端转码并调用阿里云识别（避免浏览器端 @ffmpeg 与 Turbopack 冲突）
+          // 上传 webm 到服务端，由腾讯云 ASR 进行语音识别
           const res = await fetch('/api/asr', {
             method: 'POST',
             body: blob,
-            headers: {
-              'Content-Type': 'audio/webm'
-            }
           });
           const data = await res.json();
 
           if (data?.text) {
             setInput((prev) => prev + data.text);
+            setInterimTranscript('');
           } else if (data?.error) {
-            console.error('ASR error:', data.error, data?.details);
-            const hint = data?.details ? `（详见控制台 details）` : '';
-            setInterimTranscript(`识别失败: ${data.error}${hint}`);
+            console.error('ASR error:', data.error);
+            setInterimTranscript(`识别失败: ${data.error}`);
+            // 3秒后清除错误信息
+            setTimeout(() => setInterimTranscript(''), 3000);
           }
         } catch (e) {
-          console.error('转码或识别失败:', e);
+          console.error('识别失败:', e);
           setInterimTranscript(`处理失败: ${e instanceof Error ? e.message : '未知错误'}`);
+          setTimeout(() => setInterimTranscript(''), 3000);
         } finally {
           setVoiceStatus('idle');
-          stream.getTracks().forEach((t) => t.stop());
+          audioStream.getTracks().forEach((t) => t.stop());
         }
       };
 

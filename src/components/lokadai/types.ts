@@ -31,4 +31,5 @@ export interface ModelOption {
   name: string;
   description: string;
   avatar: string;
+  kieModel: string;  // 对应的 KIE AI 模型名称
 }

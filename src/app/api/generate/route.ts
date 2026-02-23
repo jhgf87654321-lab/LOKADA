@@ -15,8 +15,9 @@ export async function POST(_request: NextRequest) {
       prompt,
       originalImageUrl,
       aspectRatio = "1:1",
-      resolution = "1K",
-      outputFormat = "png"
+      resolution = "2K",
+      outputFormat = "png",
+      model = "nano-banana-pro"
     } = body;
 
     if (!prompt) {
@@ -44,7 +45,7 @@ export async function POST(_request: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "nano-banana-pro",
+        model: model,
         input: {
           prompt,
           image_input: imageInput,

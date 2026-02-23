@@ -1,245 +1,133 @@
 import { NextRequest, NextResponse } from "next/server";
-import COS from "cos-nodejs-sdk-v5";
-import { put } from "@vercel/blob";
-import crypto from "crypto";
+import * as tencentcloud from "tencentcloud-sdk-nodejs";
 
 export const runtime = "nodejs";
 
 const TENCENT_SECRET_ID = process.env.TENCENT_SECRET_ID;
 const TENCENT_SECRET_KEY = process.env.TENCENT_SECRET_KEY;
-const TENCENT_APP_ID = process.env.TENCENT_APP_ID;
-const COS_SECRET_ID = process.env.COS_SECRET_ID;
-const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
-const COS_BUCKET = process.env.COS_BUCKET;
-const COS_REGION = process.env.COS_REGION || "ap-shanghai";
+const TENCENT_ASR_REGION = process.env.TENCENT_ASR_REGION || "ap-guangzhou";
 
-/** 生成腾讯云 TC3 签名 - 正确的日期格式 */
-function generateTC3Authorization(secretId: string, secretKey: string, method: string, pathname: string, query: Record<string, string>, payload: string) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  // 关键：日期格式必须是 YYYY-MM-DD（带连字符）
-  const date = new Date(timestamp * 1000).toISOString().split("T")[0];
+// 腾讯云 ASR 客户端类
+const AsrClient = tencentcloud.asr.v20190614.Client;
 
-  console.log("签名参数:", { secretId: secretId?.slice(0, 10), timestamp, date });
+/** 从文件头检测音频格式 */
+function detectAudioFormat(buffer: Buffer): { format: string; sourceType: number } {
+  if (buffer.length < 4) {
+    return { format: "ogg-opus", sourceType: 1 };
+  }
 
-  // 1. 规范请求串
-  const canonicalUri = pathname || "/";
-  const canonicalQueryString = Object.keys(query).sort().map(k => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`).join("&");
-  const hashedPayload = crypto.createHash("sha256").update(payload).digest("hex");
+  const header = buffer.slice(0, 4).toString("hex").toUpperCase();
 
-  const canonicalHeaders = `content-type:application/json\nhost:asr.tencentcloudapi.com\n`;
-  const signedHeaders = "content-type;host";
+  // 检测常见音频格式
+  if (header.startsWith("52494646")) {
+    // RIFF - WAV
+    return { format: "wav", sourceType: 1 };
+  }
+  if (header.startsWith("494433") || header.startsWith("FFFB") || header.startsWith("FFF3")) {
+    // ID3 or MPEG frame - MP3
+    return { format: "mp3", sourceType: 1 };
+  }
+  if (header.startsWith("664C6143")) {
+    // fLaC - FLAC
+    return { format: "flac", sourceType: 1 };
+  }
+  if (header.startsWith("4F676753")) {
+    // OggS - OGG
+    return { format: "ogg", sourceType: 1 };
+  }
+  if (header.startsWith("234F5044") || header.startsWith("4F5044")) {
+    // #ODS or OPD - Silk
+    return { format: "silk", sourceType: 1 };
+  }
+  if (header.startsWith("1AE3")) {
+    // M4A/AAC
+    return { format: "m4a", sourceType: 1 };
+  }
 
-  const canonicalRequest = [
-    method,
-    canonicalUri,
-    canonicalQueryString,
-    canonicalHeaders,
-    signedHeaders,
-    hashedPayload
-  ].join("\n");
+  // WebM/Opus 格式检测 (webm 文件头以 EBML 头开始)
+  const fullHeader = buffer.slice(0, 20).toString("hex").toUpperCase();
+  if (fullHeader.startsWith("1A45DFA3")) {
+    // 腾讯云支持 ogg-opus 格式
+    return { format: "ogg-opus", sourceType: 1 };
+  }
 
-  // 2. 拼接待签名字符串
-  const algorithm = "TC3-HMAC-SHA256";
-  const credentialScope = `${date}/asr/tc3_request`;
-  const hashedCanonicalRequest = crypto.createHash("sha256").update(canonicalRequest).digest("hex");
-
-  const stringToSign = [
-    algorithm,
-    timestamp,
-    credentialScope,
-    hashedCanonicalRequest
-  ].join("\n");
-
-  // 3. 计算签名
-  const secretDate = crypto.createHmac("sha256", "TC3" + secretKey).update(date).digest();
-  const secretService = crypto.createHmac("sha256", secretDate).update("asr").digest();
-  const secretSigning = crypto.createHmac("sha256", secretService).update("tc3_request").digest();
-  const signature = crypto.createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
-
-  // 4. 拼接 Authorization
-  const auth = `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  console.log("Authorization:", auth.slice(0, 80) + "...");
-
-  return auth;
+  // 默认返回 ogg-opus (浏览器录音常用格式)
+  return { format: "ogg-opus", sourceType: 1 };
 }
 
-/** 腾讯云录音文件识别 - 使用 HTTP API */
-async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
-  if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
+/** 腾讯云一句话识别 */
+async function recognizeWithTencentASR(audioBuffer: Buffer): Promise<string> {
+  if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY) {
     throw new Error("腾讯云 ASR 未配置");
   }
 
-  const endpoint = "asr.tencentcloudapi.com";
-  const timestamp = Math.floor(Date.now() / 1000);
-  const date = new Date(timestamp * 1000).toISOString().split("T")[0];
+  // 检测音频格式
+  const { format, sourceType } = detectAudioFormat(audioBuffer);
 
-  // 创建识别任务 - 添加必需参数
-  const payload = JSON.stringify({
-    EngineType: "16k_zh",
-    Url: fileUrl,
-    ChannelNum: 1,
-    SampleRate: 16000,
-    SourceType: 1,  // 1 = 语音URL
-  });
-
-  console.log("创建腾讯云 ASR 任务...");
-  console.log("日期:", date);
-
-  const auth = generateTC3Authorization(
-    TENCENT_SECRET_ID,
-    TENCENT_SECRET_KEY,
-    "POST",
-    "/",
-    {},
-    payload
-  );
-
-  const response = await fetch(`https://${endpoint}/`, {
-    method: "POST",
-    headers: {
-      Authorization: auth,
-      "Content-Type": "application/json",
-      Host: endpoint,
-      "X-TC-Action": "CreateRecTask",
-      "X-TC-Version": "2019-06-14",
-      "X-TC-Timestamp": String(timestamp),
+  // 创建客户端
+  const client = new AsrClient({
+    credential: {
+      secretId: TENCENT_SECRET_ID,
+      secretKey: TENCENT_SECRET_KEY,
     },
-    body: payload,
+    region: TENCENT_ASR_REGION,
   });
 
-  const result = await response.json();
-  console.log("ASR 响应:", JSON.stringify(result).slice(0, 500));
+  // Base64 编码音频数据
+  const base64Data = audioBuffer.toString("base64");
 
-  if (result.Response?.Error) {
-    throw new Error(`腾讯云 ASR 错误: ${result.Response.Error.Message}`);
-  }
+  // 请求参数
+  const params = {
+    Data: base64Data,
+    EngSerViceType: "16k_zh",
+    SourceType: sourceType,
+    VoiceFormat: format,
+    UsrAudioKey: `audio_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  };
 
-  const taskId = result.Response?.TaskId;
-  if (!taskId) {
-    throw new Error("腾讯云 ASR 未返回 TaskId");
-  }
+  try {
+    const response: any = await client.SentenceRecognition(params);
 
-  // 轮询任务状态
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-
-    const statusPayload = JSON.stringify({
-      TaskId: taskId,
-    });
-
-    const statusAuth = generateTC3Authorization(
-      TENCENT_SECRET_ID,
-      TENCENT_SECRET_KEY,
-      "POST",
-      "/",
-      {},
-      statusPayload
-    );
-
-    const statusResponse = await fetch(`https://${endpoint}/`, {
-      method: "POST",
-      headers: {
-        Authorization: statusAuth,
-        "Content-Type": "application/json",
-        Host: endpoint,
-        "X-TC-Action": "GetTaskStatus",
-        "X-TC-Version": "2019-06-14",
-        "X-TC-Timestamp": String(timestamp),
-      },
-      body: statusPayload,
-    });
-
-    const statusResult = await statusResponse.json();
-    console.log(`轮询状态 (${i + 1}/30):`, statusResult);
-
-    if (statusResult.Response?.Error) {
-      throw new Error(`腾讯云 ASR 状态错误: ${statusResult.Response.Error.Message}`);
+    if (response.Result) {
+      return response.Result;
     }
+    return "";
+  } catch (err: unknown) {
+    console.error("ASR SDK 错误:", err);
 
-    const status = statusResult.Response?.Status;
-    if (status === 1) {
-      const resultText = statusResult.Response?.Result;
-      if (resultText) {
-        try {
-          const parsed = JSON.parse(resultText);
-          const sentences = parsed?.sentence_info?.map((s: { text: string }) => s.text).join("") || "";
-          return sentences;
-        } catch {
-          return resultText;
-        }
+    // 尝试提取更详细的错误信息
+    let errorDetails = "";
+    if (err && typeof err === "object") {
+      const errObj = err as Record<string, unknown>;
+      errorDetails = errObj.code ? ` (code: ${errObj.code})` : "";
+      if (errObj.requestId) {
+        errorDetails += ` RequestId: ${errObj.requestId}`;
       }
-      return "";
     }
-    if (status === 2) {
-      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.Response?.Result}`);
-    }
+
+    const errorMessage = err instanceof Error ? err.message : "未知错误";
+    throw new Error(`腾讯云 ASR 错误: ${errorMessage}${errorDetails}`);
   }
-
-  throw new Error("腾讯云 ASR 任务超时");
-}
-
-async function uploadToCos(buffer: Buffer): Promise<string | null> {
-  if (!COS_SECRET_ID || !COS_SECRET_KEY || !COS_BUCKET) return null;
-  const cos = new COS({ SecretId: COS_SECRET_ID, SecretKey: COS_SECRET_KEY });
-  const key = `asr/${Date.now()}-${Math.random().toString(36).slice(2)}.webm`;
-
-  await new Promise<void>((resolve, reject) => {
-    cos.putObject(
-      {
-        Bucket: COS_BUCKET,
-        Region: COS_REGION,
-        Key: key,
-        Body: buffer,
-        ContentType: "audio/webm",
-      },
-      (err) => {
-        if (err) return reject(err);
-        resolve();
-      }
-    );
-  });
-
-  const signedUrl = cos.getObjectUrl({
-    Bucket: COS_BUCKET,
-    Region: COS_REGION,
-    Key: key,
-    Sign: true,
-    Expires: 604800,
-    Protocol: "https:",
-  });
-
-  return signedUrl;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("ASR 请求 received");
-    console.log("TENCENT_SECRET_ID:", TENCENT_SECRET_ID?.slice(0, 10));
-    console.log("TENCENT_APP_ID:", TENCENT_APP_ID);
-
-    if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
+    if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY) {
       return NextResponse.json({ error: "腾讯云 ASR 未配置" }, { status: 500 });
     }
 
     const raw = Buffer.from(await req.arrayBuffer());
-    console.log("收到音频数据:", raw.length, "bytes");
 
     if (!raw.length) {
-      return NextResponse.json({ error: "empty audio" }, { status: 400 });
+      return NextResponse.json({ error: "音频数据为空" }, { status: 400 });
     }
 
-    const cosUrl = await uploadToCos(raw);
-    if (!cosUrl) {
-      const blob = await put(`asr-${Date.now()}.webm`, raw, {
-        access: "public",
-        contentType: "audio/webm",
-      });
-      const text = await recognizeWithTencentASR(blob.url);
-      return NextResponse.json({ text });
+    // 大小检查（一句话识别最大 5MB）
+    if (raw.length > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: "音频文件过大，最大支持 5MB" }, { status: 400 });
     }
 
-    console.log("COS URL:", cosUrl);
-    const text = await recognizeWithTencentASR(cosUrl);
+    const text = await recognizeWithTencentASR(raw);
     return NextResponse.json({ text });
   } catch (e: unknown) {
     console.error("ASR error:", e);

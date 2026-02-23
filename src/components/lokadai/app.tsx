@@ -24,9 +24,9 @@ const INITIAL_DESIGN: DesignState = {
 };
 
 const MODELS: ModelOption[] = [
-  { id: 'flux', name: 'Flux.1 [dev]', description: '高保真图像生成', avatar: 'https://picsum.photos/id/64/100/100' },
-  { id: 'banana', name: 'Nano Banana', description: '创意视觉增强', avatar: 'https://picsum.photos/id/65/100/100' },
-  { id: 'qwen', name: 'Qwen-VL', description: '多模态语义理解', avatar: 'https://picsum.photos/id/66/100/100' },
+  { id: 'flux', name: 'Flux.2 Pro', description: '高保真图像生成', avatar: 'https://picsum.photos/id/64/100/100', kieModel: 'flux-2/pro-image-to-image' },
+  { id: 'banana', name: 'Nano Banana', description: '创意视觉增强', avatar: 'https://picsum.photos/id/65/100/100', kieModel: 'nano-banana-pro' },
+  { id: 'qwen', name: 'Qwen-VL', description: '多模态语义理解', avatar: 'https://picsum.photos/id/66/100/100', kieModel: 'qwen/image-to-image' },
 ];
 
 // 检查 CloudBase 登录状态
@@ -188,6 +188,9 @@ const App: React.FC = () => {
     setIsCurrentAdded(false);
 
     try {
+      // 获取选中的模型信息
+      const selectedModelInfo = MODELS.find(m => m.id === selectedModel) || MODELS[0];
+
       // Call generation API
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -199,8 +202,9 @@ const App: React.FC = () => {
           prompt: text,
           originalImageUrl: uploadedImageUrl,
           aspectRatio: '1:1',
-          resolution: '1K',
-          outputFormat: 'png'
+          resolution: '2K',
+          outputFormat: 'png',
+          model: selectedModelInfo.kieModel
         })
       });
 

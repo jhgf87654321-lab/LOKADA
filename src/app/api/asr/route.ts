@@ -73,10 +73,13 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   const timestamp = Math.floor(Date.now() / 1000);
   const date = new Date(timestamp * 1000).toISOString().split("T")[0];
 
-  // 创建识别任务
+  // 创建识别任务 - 添加必需参数
   const payload = JSON.stringify({
     EngineType: "16k_zh",
     Url: fileUrl,
+    ChannelNum: 1,
+    SampleRate: 16000,
+    SourceType: 1,  // 1 = 语音URL
   });
 
   console.log("创建腾讯云 ASR 任务...");

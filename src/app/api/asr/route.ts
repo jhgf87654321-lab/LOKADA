@@ -12,43 +12,19 @@ const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
 const COS_BUCKET = process.env.COS_BUCKET;
 const COS_REGION = process.env.COS_REGION || "ap-shanghai";
 
-/** 懒加载腾讯云 SDK */
-function getAsrClient() {
-  const tencentcloud = require("tencentcloud");
-  console.log("TencentCloud SDK 模块:", Object.keys(tencentcloud));
-
-  // 尝试不同的导入方式
-  const asrModule = tencentcloud.asr;
-  console.log("ASR 模块:", asrModule ? Object.keys(asrModule) : "undefined");
-
-  if (!asrModule?.v20190614?.Client) {
-    throw new Error("无法加载腾讯云 ASR SDK，请检查 SDK 版本");
-  }
-  return asrModule.v20190614.Client;
-}
-
 /** 腾讯云录音文件识别 */
 async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
-    throw new Error("腾讯云 ASR 未配置：请设置 TENCENT_SECRET_ID、TENCENT_SECRET_KEY、TENCENT_APP_ID");
+    throw new Error("腾讯云 ASR 未配置");
   }
 
-  const AsrClient = getAsrClient();
+  // 使用正确的 SDK 导入方式
+  const tencentcloud = require("tencentcloud-sdk-nodejs");
+  const AsrClient = tencentcloud.asr.v20190614.Client;
+  const Credential = tencentcloud.common.Credential;
 
-  const clientConfig = {
-    credential: {
-      secretId: TENCENT_SECRET_ID,
-      secretKey: TENCENT_SECRET_KEY,
-    },
-    region: "ap-shanghai",
-    profile: {
-      httpProfile: {
-        endpoint: "asr.tencentcloudapi.com",
-      },
-    },
-  };
-
-  const client = new AsrClient(clientConfig);
+  const cred = new Credential(TENCENT_SECRET_ID, TENCENT_SECRET_KEY);
+  const client = new AsrClient(cred, "ap-shanghai");
 
   // 创建识别任务
   const createParams = {
@@ -58,14 +34,20 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
 
   console.log("创建腾讯云 ASR 任务...");
 
-  const createResult = await client.CreateRecTask(createParams);
+  const createResult = await new Promise((resolve, reject) => {
+    client.CreateRecTask(createParams, (err: any, response: any) => {
+      if (err) reject(err);
+      else resolve(response);
+    });
+  });
+
   console.log("ASR 任务创建结果:", createResult);
 
-  if (createResult.Error) {
-    throw new Error(`腾讯云 ASR 错误: ${createResult.Error.Message}`);
+  if ((createResult as any).Error) {
+    throw new Error(`腾讯云 ASR 错误: ${(createResult as any).Error.Message}`);
   }
 
-  const taskId = createResult.TaskId;
+  const taskId = (createResult as any).TaskId;
   if (!taskId) {
     throw new Error("腾讯云 ASR 未返回 TaskId");
   }
@@ -74,12 +56,18 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 2000));
 
-    const statusResult = await client.DescribeTaskStatus({ TaskId: taskId });
+    const statusResult = await new Promise((resolve, reject) => {
+      client.DescribeTaskStatus({ TaskId: taskId }, (err: any, response: any) => {
+        if (err) reject(err);
+        else resolve(response);
+      });
+    });
+
     console.log(`轮询任务状态 (${i + 1}/30):`, statusResult);
 
-    const status = statusResult.Status;
+    const status = (statusResult as any).Status;
     if (status === 1) {
-      const resultText = statusResult.Result;
+      const resultText = (statusResult as any).Result;
       if (resultText) {
         try {
           const parsed = JSON.parse(resultText);
@@ -92,7 +80,7 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
       return "";
     }
     if (status === 2) {
-      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.ErrorMessage}`);
+      throw new Error(`腾讯云 ASR 任务失败: ${(statusResult as any).ErrorMessage}`);
     }
   }
 
@@ -137,10 +125,7 @@ export async function POST(req: NextRequest) {
     console.log("ASR 请求 received");
 
     if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
-      return NextResponse.json(
-        { error: "腾讯云 ASR 未配置" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "腾讯云 ASR 未配置" }, { status: 500 });
     }
 
     const raw = Buffer.from(await req.arrayBuffer());
@@ -150,10 +135,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "empty audio" }, { status: 400 });
     }
 
-    // 优先上传到 COS
     const cosUrl = await uploadToCos(raw);
     if (!cosUrl) {
-      // 回退到 Vercel Blob
       const blob = await put(`asr-${Date.now()}.webm`, raw, {
         access: "public",
         contentType: "audio/webm",

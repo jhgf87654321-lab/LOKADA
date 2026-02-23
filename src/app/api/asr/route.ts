@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import COS from "cos-nodejs-sdk-v5";
 import { put } from "@vercel/blob";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
 
@@ -12,62 +13,102 @@ const COS_SECRET_KEY = process.env.COS_SECRET_KEY;
 const COS_BUCKET = process.env.COS_BUCKET;
 const COS_REGION = process.env.COS_REGION || "ap-shanghai";
 
-/** 腾讯云录音文件识别 */
+/** 生成腾讯云 TC3 签名 */
+function generateTC3Authorization(secretId: string, secretKey: string, method: string, pathname: string, query: Record<string, string>, payload: string) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const date = new Date(timestamp * 1000).toISOString().split("T")[0].replace(/-/g, "");
+
+  // 1. 规范请求串
+  const canonicalUri = pathname || "/";
+  const canonicalQueryString = Object.keys(query).sort().map(k => `${encodeURIComponent(k)}=${encodeURIComponent(query[k])}`).join("&");
+  const hashedPayload = crypto.createHash("sha256").update(payload).digest("hex");
+
+  const canonicalHeaders = `content-type:application/json\nhost:asr.tencentcloudapi.com\n`;
+  const signedHeaders = "content-type;host";
+
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    hashedPayload
+  ].join("\n");
+
+  // 2. 拼接待签名字符串
+  const algorithm = "TC3-HMAC-SHA256";
+  const credentialScope = `${date}/asr/tc3_request`;
+  const hashedCanonicalRequest = crypto.createHash("sha256").update(canonicalRequest).digest("hex");
+
+  const stringToSign = [
+    algorithm,
+    timestamp,
+    credentialScope,
+    hashedCanonicalRequest
+  ].join("\n");
+
+  // 3. 计算签名
+  const secretDate = crypto.createHmac("sha256", "TC3" + secretKey).update(date).digest();
+  const secretService = crypto.createHmac("sha256", secretDate).update("asr").digest();
+  const secretSigning = crypto.createHmac("sha256", secretService).update("tc3_request").digest();
+  const signature = crypto.createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
+
+  // 4. 拼接 Authorization
+  return `${algorithm} Credential=${secretId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+}
+
+/** 腾讯云录音文件识别 - 使用 HTTP API */
 async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   if (!TENCENT_SECRET_ID || !TENCENT_SECRET_KEY || !TENCENT_APP_ID) {
     throw new Error("腾讯云 ASR 未配置");
   }
 
-  // 动态导入腾讯云 SDK
-  const tencentcloud = await import("tencentcloud-sdk-nodejs");
-  const AsrClient = tencentcloud.asr.v20190614.Client;
-  const Credential = tencentcloud.common.Credential;
-
-  const cred = new Credential(TENCENT_SECRET_ID, TENCENT_SECRET_KEY);
-  const client = new AsrClient(cred, "ap-shanghai");
-
-  // 为 SDK 设置 fetch（Node.js 18+ 需要）
-  // @ts-ignore
-  if (typeof globalThis.fetch === "undefined") {
-    const { default: fetch } = await import("node-fetch");
-    // @ts-ignore
-    globalThis.fetch = fetch;
-    // @ts-ignore
-    globalThis.Response = fetch.Response;
-  }
-
-  // 使用回调包装为 Promise
-  const createTask = (params: any) => new Promise((resolve, reject) => {
-    client.CreateRecTask(params, (err: any, response: any) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
-
-  const getTaskStatus = (params: any) => new Promise((resolve, reject) => {
-    client.DescribeTaskStatus(params, (err: any, response: any) => {
-      if (err) reject(err);
-      else resolve(response);
-    });
-  });
+  const endpoint = "asr.tencentcloudapi.com";
+  const timestamp = Math.floor(Date.now() / 1000);
 
   // 创建识别任务
-  const createParams = {
+  const createPayload = JSON.stringify({
     EngineType: "16k_zh",
     Url: fileUrl,
-  };
+    SecretId: TENCENT_SECRET_ID,
+    Timestamp: timestamp,
+    Nonce: Math.floor(Math.random() * 1000000),
+  });
+
+  const createAuth = generateTC3Authorization(
+    TENCENT_SECRET_ID,
+    TENCENT_SECRET_KEY,
+    "POST",
+    "/",
+    {},
+    createPayload
+  );
 
   console.log("创建腾讯云 ASR 任务...");
 
-  const createResult = await createTask(createParams) as any;
+  const createResponse = await fetch(`https://${endpoint}/`, {
+    method: "POST",
+    headers: {
+      Authorization: createAuth,
+      "Content-Type": "application/json",
+      Host: endpoint,
+      "X-TC-Action": "CreateRecTask",
+      "X-TC-Version": "2019-06-14",
+      "X-TC-Timestamp": String(timestamp),
+    },
+    body: createPayload,
+  });
+
+  const createResult = await createResponse.json() as any;
   console.log("ASR 任务创建结果:", createResult);
 
-  if (createResult.Error) {
-    throw new Error(`腾讯云 ASR 错误: ${createResult.Error.Message}`);
+  if (createResult.Response?.Error) {
+    throw new Error(`腾讯云 ASR 错误: ${createResult.Response.Error.Message}`);
   }
 
-  const taskId = createResult.TaskId;
+  const taskId = createResult.Response?.TaskId;
   if (!taskId) {
+    console.error("ASR 响应:", createResult);
     throw new Error("腾讯云 ASR 未返回 TaskId");
   }
 
@@ -75,12 +116,45 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
   for (let i = 0; i < 30; i++) {
     await new Promise((r) => setTimeout(r, 2000));
 
-    const statusResult = await getTaskStatus({ TaskId: taskId }) as any;
+    const statusPayload = JSON.stringify({
+      TaskId: taskId,
+      SecretId: TENCENT_SECRET_ID,
+      Timestamp: timestamp,
+      Nonce: Math.floor(Math.random() * 1000000),
+    });
+
+    const statusAuth = generateTC3Authorization(
+      TENCENT_SECRET_ID,
+      TENCENT_SECRET_KEY,
+      "POST",
+      "/",
+      {},
+      statusPayload
+    );
+
+    const statusResponse = await fetch(`https://${endpoint}/`, {
+      method: "POST",
+      headers: {
+        Authorization: statusAuth,
+        "Content-Type": "application/json",
+        Host: endpoint,
+        "X-TC-Action": "GetTaskStatus",
+        "X-TC-Version": "2019-06-14",
+        "X-TC-Timestamp": String(timestamp),
+      },
+      body: statusPayload,
+    });
+
+    const statusResult = await statusResponse.json() as any;
     console.log(`轮询任务状态 (${i + 1}/30):`, statusResult);
 
-    const status = statusResult.Status;
+    if (statusResult.Response?.Error) {
+      throw new Error(`腾讯云 ASR 状态错误: ${statusResult.Response.Error.Message}`);
+    }
+
+    const status = statusResult.Response?.Status;
     if (status === 1) {
-      const resultText = statusResult.Result;
+      const resultText = statusResult.Response?.Result;
       if (resultText) {
         try {
           const parsed = JSON.parse(resultText);
@@ -93,7 +167,7 @@ async function recognizeWithTencentASR(fileUrl: string): Promise<string> {
       return "";
     }
     if (status === 2) {
-      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.ErrorMessage}`);
+      throw new Error(`腾讯云 ASR 任务失败: ${statusResult.Response?.Result}`);
     }
   }
 

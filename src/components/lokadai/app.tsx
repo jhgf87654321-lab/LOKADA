@@ -309,7 +309,8 @@ const App: React.FC = () => {
         timestamp: Date.now()
       };
       setGalleryImages(prev => [newImg, ...prev]);
-      setDesignState(prev => ({ ...prev, afterUrl: url }));
+      // 上传图片后，同时更新 beforeUrl 和 afterUrl
+      setDesignState(prev => ({ ...prev, beforeUrl: url, afterUrl: url }));
       setUploadedImageUrl(url);
       setMessages(prev => [...prev, { role: Role.USER, text: `已上传文件: ${file.name}` }]);
       setIsCurrentAdded(true);

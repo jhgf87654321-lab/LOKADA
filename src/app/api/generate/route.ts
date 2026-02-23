@@ -5,6 +5,9 @@ const KIE_AI_API_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_AI_API_KEY = process.env.KIE_AI_API_KEY!;
 const NEXT_PUBLIC_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
+// 调试日志
+console.log("DEBUG - KIE_AI_API_KEY:", KIE_AI_API_KEY ? "已配置" : "未配置");
+
 export async function POST(_request: NextRequest) {
   try {
     const headersList = await headers();

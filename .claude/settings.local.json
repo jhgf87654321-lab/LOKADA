@@ -24,7 +24,8 @@
       "Bash(GIT_TRACE=1 GIT_CURL_VERBOSE=1 git push:*)",
       "Bash(gh auth login:*)",
       "Bash(export:*)",
-      "WebFetch(domain:www.better-auth.com)"
+      "WebFetch(domain:www.better-auth.com)",
+      "WebFetch(domain:cloud.tencent.com)"
     ]
   }
 }

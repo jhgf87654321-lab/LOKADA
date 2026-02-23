@@ -8,6 +8,10 @@ const cos = new COS({
   SecretKey: process.env.COS_SECRET_KEY!,
 });
 
+// 调试日志
+console.log("DEBUG - COS_SECRET_ID:", process.env.COS_SECRET_ID ? "已配置" : "未配置");
+console.log("DEBUG - COS_BUCKET:", process.env.COS_BUCKET ? "已配置" : "未配置");
+
 function putObject(params: any): Promise<any> {
   return new Promise((resolve, reject) => {
     cos.putObject(params, (err, data) => {

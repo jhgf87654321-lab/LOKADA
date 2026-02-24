@@ -57,9 +57,8 @@ export async function POST(_request: NextRequest) {
       body: JSON.stringify({
         model: model,
         input: {
-          input_urls: imageInput,  // 添加 input_urls 字段
+          image_url: imageInput[0] || null,  // 使用 image_url 字段
           prompt,
-          image_input: imageInput,
           aspect_ratio: aspectRatio,
           resolution,
           output_format: outputFormat,

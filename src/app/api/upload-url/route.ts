@@ -3,6 +3,11 @@ import COS from 'cos-nodejs-sdk-v5';
 
 export const runtime = 'nodejs';
 
+const cos = new COS({
+  SecretId: process.env.COS_SECRET_ID!,
+  SecretKey: process.env.COS_SECRET_KEY!,
+});
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

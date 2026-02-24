@@ -354,9 +354,10 @@ const App: React.FC = () => {
       setIsCurrentAdded(true);
     } catch (error: any) {
       console.error('Upload error:', error);
+      const errorMsg = error?.message || String(error) || '请稍后重试';
       setMessages(prev => [...prev, {
         role: Role.MODEL,
-        text: `上传失败：${error.message || '请稍后重试'}`
+        text: `上传失败：${errorMsg}`
       }]);
     }
   };

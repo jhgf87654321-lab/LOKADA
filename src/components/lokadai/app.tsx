@@ -311,45 +311,47 @@ const App: React.FC = () => {
     }
 
     try {
-      const response = await fetch('/api/upload', {
+      setMessages(prev => [...prev, { role: Role.USER, text: `正在上传: ${file.name}...` }]);
+
+      // 步骤1: 获取预签名上传URL
+      const presignResponse = await fetch('/api/upload-url', {
         method: 'POST',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-          'x-file-name': encodeURIComponent(file.name || 'upload'),
-        },
-        body: file,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type || 'image/png'
+        })
       });
 
-      const raw = await response.text();
-      let data: any = undefined;
-      try {
-        data = raw ? JSON.parse(raw) : undefined;
-      } catch {
-        data = undefined;
+      if (!presignResponse.ok) {
+        throw new Error('获取上传地址失败');
       }
 
-      if (!response.ok) {
-        const errMsg =
-          (data && typeof data === 'object' ? (data.error ?? data.message) : undefined) ??
-          (raw || undefined) ??
-          '上传失败';
-        throw new Error(`[${response.status}] ${String(errMsg)}`);
+      const { uploadUrl, url: finalUrl } = await presignResponse.json();
+
+      // 步骤2: 直接上传到COS
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'image/png',
+        },
+        body: file
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`上传失败: ${uploadResponse.status}`);
       }
 
-      const url = data?.url;
-      if (typeof url !== 'string' || !url) {
-        throw new Error('上传失败：未返回 url');
-      }
       const newImg: ImageAsset = {
         id: Date.now().toString(),
-        url: url,
+        url: finalUrl,
         alt: `上传图: ${file.name}`,
         timestamp: Date.now()
       };
       setGalleryImages(prev => [newImg, ...prev]);
       // 上传图片后，同时更新 beforeUrl 和 afterUrl
-      setDesignState(prev => ({ ...prev, beforeUrl: url, afterUrl: url }));
-      setUploadedImageUrl(url);
+      setDesignState(prev => ({ ...prev, beforeUrl: finalUrl, afterUrl: finalUrl }));
+      setUploadedImageUrl(finalUrl);
       setMessages(prev => [...prev, { role: Role.USER, text: `已上传文件: ${file.name}` }]);
       setIsCurrentAdded(true);
     } catch (error: any) {

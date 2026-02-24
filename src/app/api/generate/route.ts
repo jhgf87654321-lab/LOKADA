@@ -58,9 +58,14 @@ export async function POST(_request: NextRequest) {
       callBackUrl: `${NEXT_PUBLIC_BASE_URL}/api/callback`,
     };
 
-    // 只有当有图片时才添加 image_url
+    // 根据模型类型添加图片参数
+    // flux 模型需要 input_urls，nano-banana-pro 需要 image_url
     if (imageInput.length > 0) {
-      requestBody.input.image_url = imageInput[0];
+      if (model.includes('flux')) {
+        requestBody.input.input_urls = imageInput;
+      } else {
+        requestBody.input.image_url = imageInput[0];
+      }
     }
 
     let kieResponse;

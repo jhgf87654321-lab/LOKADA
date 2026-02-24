@@ -107,8 +107,10 @@ const App: React.FC = () => {
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  // 使用 Map 管理多个任务的轮询
+  const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const completedTasksRef = useRef<Set<string>>(new Set()); // 记录已完成的任务
+  const activeTaskIdRef = useRef<string | null>(null); // 当前正在生成的任务 ID
 
   // Polling for task status
   const pollTaskStatus = useCallback(async (taskId: string) => {
@@ -128,8 +130,17 @@ const App: React.FC = () => {
           // 标记任务已处理
           completedTasksRef.current.add(taskId);
 
-          // Task completed
-          setIsGenerating(false);
+          // 清除该任务的轮询
+          const interval = pollingIntervalsRef.current.get(taskId);
+          if (interval) {
+            clearInterval(interval);
+            pollingIntervalsRef.current.delete(taskId);
+          }
+
+          // Task completed - 只有当前任务才更新 isGenerating
+          if (activeTaskIdRef.current === taskId) {
+            setIsGenerating(false);
+          }
 
           const newImg: ImageAsset = {
             id: taskId,
@@ -150,23 +161,31 @@ const App: React.FC = () => {
             text: "图片已生成完成！您可以在右侧预览生成的图片。"
           }]);
 
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
+          // 清除该任务的轮询
+          const completedInterval = pollingIntervalsRef.current.get(taskId);
+          if (completedInterval) {
+            clearInterval(completedInterval);
+            pollingIntervalsRef.current.delete(taskId);
           }
         } else if (task.status === 'failed') {
           // 标记任务已处理
           completedTasksRef.current.add(taskId);
 
-          setIsGenerating(false);
+          // 只有当前任务才更新 isGenerating
+          if (activeTaskIdRef.current === taskId) {
+            setIsGenerating(false);
+          }
+
           setMessages(prev => [...prev, {
             role: Role.MODEL,
             text: `图片生成失败：${task.failMessage || '未知错误'}`
           }]);
 
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
+          // 清除该任务的轮询
+          const failedInterval = pollingIntervalsRef.current.get(taskId);
+          if (failedInterval) {
+            clearInterval(failedInterval);
+            pollingIntervalsRef.current.delete(taskId);
           }
         }
       }
@@ -178,9 +197,10 @@ const App: React.FC = () => {
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      pollingIntervalsRef.current.forEach((interval) => {
+        clearInterval(interval);
+      });
+      pollingIntervalsRef.current.clear();
     };
   }, []);
 
@@ -242,23 +262,21 @@ const App: React.FC = () => {
 
       if (data && data.success && data.taskId) {
         setCurrentTaskId(data.taskId);
+        // 设置当前活动任务 ID
+        activeTaskIdRef.current = data.taskId;
+        // 保持 isGenerating 为 true
 
         setMessages(prev => [...prev, {
           role: Role.MODEL,
           text: "已收到您的需求，正在创建生成任务..."
         }]);
 
-        // 清除之前的轮询和已完成任务记录
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
-        }
-        completedTasksRef.current.clear();
-
-        // Start polling
-        pollingRef.current = setInterval(() => {
+        // 不再清除之前的轮询，让多个任务并行处理
+        // 为新任务创建轮询
+        const newInterval = setInterval(() => {
           pollTaskStatus(data.taskId);
         }, 3000);
+        pollingIntervalsRef.current.set(data.taskId, newInterval);
 
         // Initial check after 3 seconds
         setTimeout(() => {

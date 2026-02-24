@@ -46,6 +46,23 @@ export async function POST(_request: NextRequest) {
       );
     }
 
+    // 构建请求体
+    const requestBody: any = {
+      model: model,
+      input: {
+        prompt,
+        aspect_ratio: aspectRatio,
+        resolution,
+        output_format: outputFormat,
+      },
+      callBackUrl: `${NEXT_PUBLIC_BASE_URL}/api/callback`,
+    };
+
+    // 只有当有图片时才添加 image_url
+    if (imageInput.length > 0) {
+      requestBody.input.image_url = imageInput[0];
+    }
+
     let kieResponse;
     try {
       kieResponse = await fetch(KIE_AI_API_URL, {
@@ -54,17 +71,7 @@ export async function POST(_request: NextRequest) {
         "Authorization": `Bearer ${KIE_AI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: model,
-        input: {
-          image_url: imageInput[0] || null,  // 使用 image_url 字段
-          prompt,
-          aspect_ratio: aspectRatio,
-          resolution,
-          output_format: outputFormat,
-        },
-        callBackUrl: `${NEXT_PUBLIC_BASE_URL}/api/callback`,
-      }),
+      body: JSON.stringify(requestBody),
     });
     } catch (fetchError: unknown) {
       console.error("Fetch error:", fetchError);

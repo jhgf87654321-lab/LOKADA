@@ -108,9 +108,15 @@ const App: React.FC = () => {
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const completedTasksRef = useRef<Set<string>>(new Set()); // 记录已完成的任务
 
   // Polling for task status
   const pollTaskStatus = useCallback(async (taskId: string) => {
+    // 如果任务已经处理过，跳过
+    if (completedTasksRef.current.has(taskId)) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/generate/${taskId}`);
       const data = await response.json();
@@ -119,6 +125,9 @@ const App: React.FC = () => {
         const task = data.task;
 
         if (task.status === 'completed' && task.generatedImageUrl) {
+          // 标记任务已处理
+          completedTasksRef.current.add(taskId);
+
           // Task completed
           setIsGenerating(false);
 
@@ -146,6 +155,9 @@ const App: React.FC = () => {
             pollingRef.current = null;
           }
         } else if (task.status === 'failed') {
+          // 标记任务已处理
+          completedTasksRef.current.add(taskId);
+
           setIsGenerating(false);
           setMessages(prev => [...prev, {
             role: Role.MODEL,
@@ -235,6 +247,13 @@ const App: React.FC = () => {
           role: Role.MODEL,
           text: "已收到您的需求，正在创建生成任务..."
         }]);
+
+        // 清除之前的轮询和已完成任务记录
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        completedTasksRef.current.clear();
 
         // Start polling
         pollingRef.current = setInterval(() => {

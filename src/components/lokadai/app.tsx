@@ -328,17 +328,27 @@ const App: React.FC = () => {
       }
 
       const { uploadUrl, url: finalUrl } = await presignResponse.json();
+      console.log("Uploading to:", uploadUrl);
 
       // 步骤2: 直接上传到COS
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'image/png',
-        },
-        body: file
-      });
+      let uploadResponse;
+      try {
+        uploadResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'image/png',
+          },
+          body: file
+        });
+        console.log("Upload response status:", uploadResponse.status);
+      } catch (fetchError: any) {
+        console.error("Upload fetch error:", fetchError);
+        throw new Error(`上传失败: ${fetchError.message || '网络错误'}`);
+      }
 
       if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error("Upload failed:", uploadResponse.status, errorText);
         throw new Error(`上传失败: ${uploadResponse.status}`);
       }
 

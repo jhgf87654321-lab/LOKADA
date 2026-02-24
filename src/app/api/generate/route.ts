@@ -77,7 +77,7 @@ export async function POST(_request: NextRequest) {
     }
 
     const kieData = await kieResponse.json();
-    console.log("Kie.ai API response:", kieResponse.status, kieData);
+    console.log("Kie.ai API response:", kieResponse.status, JSON.stringify(kieData));
 
     if (!kieResponse.ok) {
       console.error("Kie.ai API error:", kieData);
@@ -87,7 +87,8 @@ export async function POST(_request: NextRequest) {
       );
     }
 
-    const taskId = kieData.data?.taskId as string | undefined;
+    // 尝试多种可能的响应格式
+    const taskId = kieData.data?.taskId || kieData.data?.recordId || kieData.taskId || kieData.recordId;
     console.log("Task ID extracted:", taskId);
 
     if (!taskId) {
